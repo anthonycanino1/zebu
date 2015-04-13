@@ -54,8 +54,101 @@ Zebu highlights...
 
 \end{itemize}
 
-\section{Lexical Analysis}
+\subsection{Extention Features}
 
-\section{Parser Generator}
+All definitions (regular definitions and grammar rules) are subject to the same extensible syntax and semantics. The expected extention rules are...
+
+\begin{itemize}
+
+\item \textbf{extend} : Add new productions to an existing production in the grammar.
+
+\item \textbf{inherit} : Copy and existing production and use it to define a new production. Similar to extend, but the origin production is not modified.
+
+\item \textbf{override} : Replace a production in the grammar.
+
+\item \textbf{delete} : Remove a production from a grammar.
+
+\end{itemize}
+
+\section{Zebu Language}
+
+\subsection{Reserved Words}
+Zebu reserves the following identifiers for use as keywords.
+
+\begin{center}
+\begin{tabular}{c c c c}
+\textbf{grammar} & \textbf{import} & \textbf{keyword} & \textbf{extend}   \\
+\textbf{inherit} & \textbf{override} & \textbf{delete}                    \\
+\end{tabular}
+\end{center}
+
+\subsection{Regular Definitions}
+
+Regular definitions have the following format and semantic restrictions.
+
+\begin{verbatim}
+Head : Body ;
+\end{verbatim}
+
+\begin{itemize}
+
+\item The head of a regular definitions must begin with an uppercase character and may be followed by zero or more alphanumeric characters. This is done to ease parsing and enforce a style on the actual grammar definition.
+
+\item The body of a regular definition may contain any valid unicode character, previously defined regular definition, and regular definition operator.
+
+\item The standard dot (.) represents any valid unicode character.
+
+\item The regular definition operators are defined as
+  \begin{itemize}
+    \item \textbf{X*} : Match X zero or more times
+    \item \textbf{X+} : Match X zero or more times
+    \item \textbf{X\textbar Y} : Match X or Y
+    \item \textbf{(X)}  : Group X to form an inline regular definition.
+    \item \textbf{X\{r\}}  : Match X r times, where r is a range defined as 
+      \begin{itemize}
+        \item \{m\} : Match exactly m times
+        \item \{m,n\} : Match m through n times
+        \item \{,n\} : Match up to n times
+        \item \{m,\} : Match at least m times
+      \end{itemize}
+    \item \textbf{\textasciicircum X} : Match anything \textbf{but} X.
+    \item \textbf{[X Y Z]} : Match either X, Y, or Z. Spaces are optional for unicode characters, but necessary when using regular definitions.
+    \item \textbf{[X-Y]}  : Match any unicode character between X and Y, including both. The range operator \textbf{can not} be used on regular definitions.
+  \end{itemize}
+
+\item Backslash escapes regular definition operators, and is used to access the setup of predefined regular definitions. The set includes
+  \begin{itemize}
+    \item \textbackslash s : Any whitespace character except newline.
+    \item \textbackslash n : Newline.
+  \end{itemize}
+
+\end{itemize}
+
+The following is a Zebu grammar describing regular expressions as recognized by Zebu.
+
+\begin{verbatim}
+
+grammar regular_definition;
+
+RegDefStart : [A-Z] ;
+RegDefPart  : .     ;
+
+RegDefHead  : RegDefStart RegDefPart* ;
+
+OpDot           : \.  ;
+OpComma         : ,   ;
+OpStar          : \*  ;
+OpPlus          : \+  ;
+OpBar           : \|  ;
+OpCircum        : \^  ;
+OpLeftParan     : \(  ;
+OpRightParan    : \)  ;
+OpLeftBrace     : \{  ;
+OpRightBrace    : \}  ;
+OpLeftBracket   : \[  ;
+OpRightBracket  : \]  ;
+OpRange         : -   ;
+
+\end{verbatim}
 
 \end{document}
