@@ -100,21 +100,43 @@ Head : Body ;
 
 \item The regular definition operators are defined as
   \begin{itemize}
-    \item \textbf{X*} : Match X zero or more times
-    \item \textbf{X+} : Match X zero or more times
-    \item \textbf{X\textbar Y} : Match X or Y
-    \item \textbf{(X)}  : Group X to form an inline regular definition.
-    \item \textbf{X\{r\}}  : Match X r times, where r is a range defined as 
+    \item \textbf{X* "kleene"} : Match X zero or more times
+    \item \textbf{X+ "plus"} : Match X zero or more times
+    \item \textbf{X\textbar Y "alternation"} : Match X or Y
+    \item \textbf{(X) "group"}  : Group X to form an inline regular definition.
+    \item \textbf{X\{r\} "repeat"}  : Match X r times, where r is a range defined as 
       \begin{itemize}
         \item \{m\} : Match exactly m times
         \item \{m,n\} : Match m through n times
         \item \{,n\} : Match up to n times
         \item \{m,\} : Match at least m times
       \end{itemize}
-    \item \textbf{\textasciicircum X} : Match anything \textbf{but} X.
-    \item \textbf{[X Y Z]} : Match either X, Y, or Z. Spaces are optional for unicode characters, but necessary when using regular definitions.
-    \item \textbf{[X-Y]}  : Match any unicode character between X and Y, including both. The range operator \textbf{can not} be used on regular definitions.
+    \item \textbf{[?] "class"} : Match any unicode character defined in the character class. Character classes have additional operators.
   \end{itemize}
+
+\item The precedence of operators are defined as (highest to lowest)
+  \begin{itemize}
+    \item \textbf{group}
+    \item \textbf{class}
+    \item \textbf{repeat}
+    \item \textbf{kleene} \textbar \ \textbf{plus}
+    \item \textbf{alternation}
+    \item \textbf{catenation}
+  \end{itemize} 
+
+\item The regular definition operators for a character class are defined as
+  \begin{itemize}
+    \item \textbf{[XYZ] "catenation"} : Match X, Y, or Z. Only unicode characters may be used in a class, regular definitions are not allowed.
+    \item \textbf{[\textasciicircum X] "except"} : Match any character not included in the class. Can only be defined at the start of the class.
+    \item \textbf{[X-Y] "range"}  : Match any unicode character between X and Y, including both. The range operator \textbf{can not} be used on regular definitions.
+  \end{itemize}
+
+\item The precedence of class operators are defined as (highest to lowest)
+  \begin{itemize}
+    \item \textbf{except}
+    \item \textbf{range}
+    \item \textbf{catenation}
+  \end{itemize} 
 
 \item Backslash escapes regular definition operators, and is used to access the setup of predefined regular definitions. The set includes
   \begin{itemize}
@@ -128,26 +150,109 @@ The following is a Zebu grammar describing regular expressions as recognized by 
 
 \begin{verbatim}
 
+/* Problem: Clean way to combine regular definition with unicode characters
+ * in a way that is easy to parse and use? */
+
+Can we say?
+
 grammar regular_definition;
 
-RegDefStart : [A-Z] ;
-RegDefPart  : .     ;
+RegDefStart       : [A-Z] ;
+ZebuCharacter     : .
+RegDefId          : @(RegDefStart) @(ZebuCharacter)* ;
 
-RegDefHead  : RegDefStart RegDefPart* ;
 
-OpDot           : \.  ;
-OpComma         : ,   ;
-OpStar          : \*  ;
-OpPlus          : \+  ;
-OpBar           : \|  ;
-OpCircum        : \^  ;
-OpLeftParan     : \(  ;
-OpRightParan    : \)  ;
-OpLeftBrace     : \{  ;
-OpRightBrace    : \}  ;
-OpLeftBracket   : \[  ;
-OpRightBracket  : \]  ;
-OpRange         : -   ;
+TokDot           : \.  ;
+TokComma         : ,   ;
+TokColon         : \:  ;
+TokSemicolon     : \;  ;
+TokStar          : \*  ;
+TokPlus          : \+  ;
+TokBar           : \|  ;
+TokCircum        : \^  ;
+TokLeftParan     : \(  ;
+TokRightParan    : \)  ;
+TokLeftBrace     : \{  ;
+TokRightBrace    : \}  ;
+TokLeftBracket   : \[  ;
+TokRightBracket  : \]  ;
+TokRange         : -   ;
+TokAt            : \@  ;
+
+program 
+  : regular_definitions 
+  ;
+
+regular_definitions 
+  : regular_definition
+  | regular_definition regular_definitions
+  ;
+
+regular_definition 
+  : RegDefId TokColon sequence TokSemicolon
+  ;
+
+/* Catenation */
+sequence
+  : /* empty */
+  | sequence expression
+  ;
+
+expression
+  : expression TokBar alternation
+  | alternation
+  ;
+
+alternation
+  : kleene TokStar
+  | kleene TokPlus
+  | kleene
+  ;
+
+kleene
+  : repeat TokLeftBrace repeat_range TokRightBrace
+  | repeat
+  ;
+
+repeat_range
+  : Integer 
+  | Integer TokComma Integer
+  | Integer TokComma
+  | TokComma Integer
+  ;
+
+repeat
+  : TokLeftBracket class TokRightBracket
+  | group
+  ;
+
+class
+  : optional_negation class_sequence
+  ;
+
+optional_negation
+  : /* empty */
+  | TokCircum
+  ;
+
+class_sequence
+  : ZebuCharacter
+  | class_range
+  ;
+
+class_range
+  : ZebuCharacter TokRange ZebuCharacter
+  ;
+
+group
+  : TokLeftParan expression TokRightParan
+  | word
+  ;
+
+word
+  : UnicodeCharacter
+  | TokAt TokLeftParan RegDefId TokRightParan
+  ;
 
 \end{verbatim}
 
