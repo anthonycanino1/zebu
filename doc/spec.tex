@@ -68,6 +68,8 @@ All definitions (regular definitions and grammar rules) are subject to the same 
 
 \item \textbf{delete} : Remove a production from a grammar.
 
+\item \textbf{modify} : Modify the semantic action of a production.
+
 \end{itemize}
 
 \section{Zebu Language}
@@ -77,18 +79,14 @@ Zebu reserves the following identifiers for use as keywords.
 
 \begin{center}
 \begin{tabular}{c c c c}
-\textbf{grammar} & \textbf{import} & \textbf{keyword} & \textbf{extend}   \\
-\textbf{inherit} & \textbf{override} & \textbf{delete}                    \\
+\textbf{grammar} & \textbf{import} & \textbf{keyword} & \textbf{extend} \\
+\textbf{inherit} & \textbf{override} & \textbf{delete}& \textbf{modify} \\
 \end{tabular}
 \end{center}
 
 \subsection{Regular Definitions}
 
 Regular definitions have the following format and semantic restrictions.
-
-\begin{verbatim}
-Head : Body ;
-\end{verbatim}
 
 \begin{itemize}
 
@@ -98,51 +96,48 @@ Head : Body ;
 
 \item The standard dot (.) represents any valid unicode character.
 
-\item The regular definition operators are defined as
-  \begin{itemize}
-    \item \textbf{X* "kleene"} : Match X zero or more times
-    \item \textbf{X+ "plus"} : Match X zero or more times
-    \item \textbf{X\textbar Y "alternation"} : Match X or Y
-    \item \textbf{(X) "group"}  : Group X to form an inline regular definition.
-    \item \textbf{X\{r\} "repeat"}  : Match X r times, where r is a range defined as 
-      \begin{itemize}
-        \item \{m\} : Match exactly m times
-        \item \{m,n\} : Match m through n times
-        \item \{,n\} : Match up to n times
-        \item \{m,\} : Match at least m times
-      \end{itemize}
-    \item \textbf{[?] "class"} : Match any unicode character defined in the character class. Character classes have additional operators.
-  \end{itemize}
+\item The regular definition operators are defined as follows, in order of highest precedence to lowest precedence
 
-\item The precedence of operators are defined as (highest to lowest)
-  \begin{itemize}
-    \item \textbf{group}
-    \item \textbf{class}
-    \item \textbf{repeat}
-    \item \textbf{kleene} \textbar \ \textbf{plus}
-    \item \textbf{alternation}
-    \item \textbf{catenation}
-  \end{itemize} 
+\begin{footnotesize}
+\begin{tabular}{l l l}
+\textbf{group}        & (X)         & Group X to form an inline regular definition. \\
+\textbf{class}        & [?]          & Match any unicode character defined in the character class.  \\
+\textbf{repeat}       & X\{r\}      & Match X r times, where r is a repeat range.  \\
+\textbf{kleene}       & X*          & Match X zero or more times.  \\
+\textbf{alternation}  & X\textbar Y & Match X or Y.  \\
+\textbf{catenation}   & XY          & Match XY.      \\
+\end{tabular}
+\end{footnotesize}
 
-\item The regular definition operators for a character class are defined as
-  \begin{itemize}
-    \item \textbf{[XYZ] "catenation"} : Match X, Y, or Z. Only unicode characters may be used in a class, regular definitions are not allowed.
-    \item \textbf{[\textasciicircum X] "except"} : Match any character not included in the class. Can only be defined at the start of the class.
-    \item \textbf{[X-Y] "range"}  : Match any unicode character between X and Y, including both. The range operator \textbf{can not} be used on regular definitions.
-  \end{itemize}
+\item A repeat range is defined as follows
 
-\item The precedence of class operators are defined as (highest to lowest)
-  \begin{itemize}
-    \item \textbf{except}
-    \item \textbf{range}
-    \item \textbf{catenation}
-  \end{itemize} 
+\begin{footnotesize}
+\begin{tabular}{l l}
+\{m\}   & Match exactly m times     \\
+\{m,n\} & Match m through n times   \\
+\{,n\}  & Match up to n times       \\
+\{m,\}  & Match at least m times    \\
+\end{tabular}
+\end{footnotesize}
+
+\item The regular definition operators for a character class are defined as follows, in order of highest precedence to lowest precedence
+
+\begin{footnotesize}
+\begin{tabular}{l l l}
+\textbf{except}     & [\textasciicircum X]  & Match any character not included in the class. Can only be defined at the start of the class. \\
+\textbf{range}      & [X-Y]                 & Match any unicode character between X and Y, including both. \\
+\textbf{catenation} & [XYZ]                 & Match X, Y, or Z. \\
+\end{tabular}
+\end{footnotesize}
 
 \item Backslash escapes regular definition operators, and is used to access the setup of predefined regular definitions. The set includes
-  \begin{itemize}
-    \item \textbackslash s : Any whitespace character except newline.
-    \item \textbackslash n : Newline.
-  \end{itemize}
+
+\begin{footnotesize}
+\begin{tabular}{l l}
+\textbackslash s & Any whitespace character except newline. \\
+\textbackslash n & Newline. \\
+\end{tabular}
+\end{footnotesize}
 
 \end{itemize}
 
@@ -150,17 +145,14 @@ The following is a Zebu grammar describing regular expressions as recognized by 
 
 \begin{verbatim}
 
-/* Problem: Clean way to combine regular definition with unicode characters
- * in a way that is easy to parse and use? */
-
-Can we say?
-
 grammar regular_definition;
 
-RegDefStart       : [A-Z] ;
-ZebuCharacter     : .
-RegDefId          : @(RegDefStart) @(ZebuCharacter)* ;
+EscapeChararacter : \\ .  ;
+ZebuCharacter     : @EscapeChararacter | [^\\]  ;
 
+RegDefStart       : [A-Z] ;
+RegDefPart        : [a-zA-Z0-9] ;
+RegDefId          : @RegDefStart @RegDefPart* ;
 
 TokDot           : \.  ;
 TokComma         : ,   ;
@@ -195,23 +187,23 @@ regular_definition
 /* Catenation */
 sequence
   : /* empty */
-  | sequence expression
-  ;
-
-expression
-  : expression TokBar alternation
-  | alternation
+  | sequence alternation
   ;
 
 alternation
-  : kleene TokStar
-  | kleene TokPlus
+  : alternation TokBar kleene
   | kleene
   ;
 
 kleene
-  : repeat TokLeftBrace repeat_range TokRightBrace
+  : repeat TokStar
+  | repeat TokPlus
   | repeat
+  ;
+
+repeat
+  : class TokLeftBrace repeat_range TokRightBrace
+  | class
   ;
 
 repeat_range
@@ -221,12 +213,12 @@ repeat_range
   | TokComma Integer
   ;
 
-repeat
-  : TokLeftBracket class TokRightBracket
+class
+  : TokLeftBracket class_body TokRightBracket
   | group
   ;
 
-class
+class_body
   : optional_negation class_sequence
   ;
 
@@ -236,6 +228,11 @@ optional_negation
   ;
 
 class_sequence
+  : class_sequence class_word 
+  | class_word
+  ;
+
+class_word
   : ZebuCharacter
   | class_range
   ;
@@ -245,15 +242,252 @@ class_range
   ;
 
 group
-  : TokLeftParan expression TokRightParan
+  : TokLeftParan sequence TokRightParan
   | word
   ;
 
 word
-  : UnicodeCharacter
-  | TokAt TokLeftParan RegDefId TokRightParan
+  : ZebuCharacter
+  | TokAt RegDefId
   ;
 
 \end{verbatim}
+
+\subsection{Grammar Rules}
+
+Grammar rules have the following format and semantic restrictions
+
+\begin{itemize}
+
+\item Nonterminals must begin with a lowercase letter, terminals must begin with an uppercase letter and must be a previously defined regular definition.
+
+\item Left recursive rules and indirect left recursion are allowed.
+
+\item Semanic actions may be defined for each nonterminal. Variables to be used in the semanic actions must be assigned for an element in the rule body. If the RESULT variable is used in the semantic action, a return type must also be specified in the rule head. This explicit syntax makes it easier to follow the semantic actions, verus $1, $2 etc.
+
+\item All semantic actions have access to an implicit zebu.Parser object.
+
+\item Each rule in the RHS of a production can be defined with a label. If a label is not defined, then an implicit label is assigned for each rule in the format "rule\#{n}", where n is the number of the rule in the RHS.
+
+\item Any production can be modified using the extention features. The semantics of a modification to a grammar rule are as follows.
+
+\begin{tabular}{l l}
+\textbf{extend}   & Add new productions to a grammar rule.            \\
+\textbf{inherit}  & Create a new production that inherits all rules of another production. \\
+\textbf{override} & Override and define new rules for a production.   \\
+\textbf{delete}   & Remove this production from the grammar.          \\
+\textbf{modify}   & Modify the return type only of a production.      \\
+\end{tabular}
+
+
+\item Specific rules on the RHS can be modified by using the explicit or implic label name. Semantic change slightly when modifying a RHS rule.
+
+\begin{tabular}{l l}
+\textbf{extend}   & RHS rules can not be extended.                    \\
+\textbf{inherit}  & Create a new production using only the RHS rule.  \\
+\textbf{override} & RHS rules can not be overriden.                   \\
+\textbf{delete}   & Remove this RHS rule from the production.         \\
+\textbf{modify}   & Modify the semantic action of the RHS rule.       \\
+\end{tabular}
+
+\end{itemize}
+
+The following is a Zebu grammar describing grammar rules as recognized by Zebu.
+
+\begin{verbatim}
+
+grammar grammar_rules;
+
+RegDefStart : [A-Z] ;
+RegDefPart  : [a-zA-Z0-9] ;
+RegDefId    : @RegDefStart @RegDefPart* ;
+
+@keyword Extend     : extend    ;
+@keyword Inherit    : inherit   ;
+@keyword Override   : override  ;
+@keyword Delete     : delete    ;
+@keyword Modify     : modify    ;
+
+ProdStart   : [a-z] ;
+ProdPart    : [a-zA-Z0-9#]  ; 
+ProdId      : @ProdStart @ProdPart* ;
+
+IdStart     : [a-zA-Z]  ;
+IdPart      : [a-zA-Z0-9]  ;
+Id          : @IdStart @IdPart* ;
+
+Label       : # ProdId
+
+program
+  : productions
+  ;
+
+productions
+  : /* empty */
+  | productions production
+  ;
+
+production 
+  : normal_production
+  | extend_production
+  | inherit_production
+  | override_production
+  | delete_production
+  | modify_production
+  ;
+
+normal_production
+  : production_head TokColon production_body TokSemicolon
+  ;
+
+extend_production
+  : Extend production_head TokColon production_body TokSemicolon
+  ;
+
+inherit_production
+  : Inherit TokRightArrow production_head TokColon production_body TokSemicolon
+  ;
+
+override_production
+  : Override production_head TokColon production_body TokSemicolon
+  ;
+
+delete_production
+  : Delete ProdId TokSemicolon
+  ;
+
+modify_production
+  : Modify production_head TokColon optional_action TokSemicolon
+  ;
+
+production_head
+  : ProdId optional_return_type
+  ;
+
+optional_return_type
+  : TokEqual Id
+  ;
+
+production_body
+  : rules 
+  ; 
+
+rules
+  : rules TokBar rule
+  | rule
+  ;
+
+rule
+  : /* empty */ optional_rule_label
+  | elements optional_rule_label optional_action
+  ;
+
+elements
+  : elements element
+  | element
+  ;
+
+element
+  : terminal_or_nonterminal optional_variable_declaration
+  ;
+
+terminal_or_nonterminal
+  : terminal
+  | non_terminal
+  ;
+
+terminal
+  : RuleId
+  ;
+
+non_terminal
+  : RegDefId
+  ;
+  
+optional_variable_declaration
+  : /* empty */
+  | TokEqual Id 
+  ; 
+
+optional_rule_label 
+  : /* empty */
+  | Label
+  ;
+
+optional_action
+  : /* empty */
+  | action
+  ;
+
+action
+  : TokLeftAction code TokRightAction
+  ;
+
+\end{verbatim}
+
+\subsection{The Zebu Object \& Metaconstructs}
+
+The main interface into the Zebu parser generator is the Zebu object. This is done in order to provide an interface into the semantic actions without having to utilize globals. In addition to a standard set of methods that are available to the programmer, Zebu allows the user to add aditional data and methods to the Zebu object.
+
+\begin{itemize}
+
+\item Imports can be added to the Zebu object by utilizing the @imports metaconstruct. 
+
+\item Fields can be added to the Zebu object by utilizing the @fields metaconstruct. To avoid any name clashes, Zebu fields are prefixed with zb\_ and are reserved by the language.
+
+\item Methods can be added to the Zebu object by utilizing the @methods metaconstruct. To avoid any name clashes, Zebu methods are prefixed with zb\_ and are reserved by the language.
+
+\item All semantic actions have an implicit Zebu object that may be referenced. The object is named "zb".
+
+\begin{verbatim}
+lhs=Node
+  : rhs
+    {: 
+      zb.buildNode(...)
+    :}
+  ;
+\end{verbatim}
+
+\end{itemize}
+
+The following is a Zebu grammar describing the metaconstructs recognized by Zebu.
+
+\begin{verbatim}
+
+grammar meta_rules;
+
+Imports : \@imports;
+Fields  : \@fields;
+Methods : \@methods;
+
+program 
+  : meta_constructs
+  ;
+
+meta_constructs
+  : /* empty */
+  | meta_construct meta_constructs
+  ;
+
+meta_construct
+  : meta_import
+  | meta_field
+  | meta_method
+  ;
+
+meta_import 
+  : Imports TokLeftBrace code TokRightBrace
+  ;
+
+meta_field 
+  : Fields TokLeftBrace code TokRightBrace
+  ;
+
+meta_method 
+  : Methods TokLeftBrace code TokRightBrace
+  ;
+
+\end{verbatim}
+
 
 \end{document}
