@@ -1,0 +1,48 @@
+grammar regular_definition;
+
+/*
+EscapeCharacter : '\\' . ;
+ZebuCharacter   : EscapeCharacter | [^\\] ;
+
+LongString      : 'this "whole \'string can match\n'
+
+RegDefStart     : [A-Z] ;
+RegDefPart      : [a-zA-Z0-9] ;
+RegDefId        : RegDefStart RegDefPart*
+
+TokDot          : '.'  ;
+TokComma        : ','  ;
+TokColon        : ':'  ;
+TokSemiColon    : ';'  ;
+TokStar         : '*'  ;
+TokPlus         : '+'  ;
+TokBar          : '|'  ;
+TokCircum       : '^'  ;
+TokLParan       : '('  ;
+TokRParan       : ')'  ;
+TokLBrace       : '{'  ;
+TokRBrace       : '}'  ;
+TokLBrack       : '['  ;
+TokRBrack       : ']'  ;
+TokRange        : '-'  ;
+TokAt           : '@'  ;
+*/
+
+program
+  : regular_definitions
+  ;
+
+regular_definitions
+  : regular_definition=$1
+  | regular_definition=$1 regular_definitions=$2
+  ;
+
+regular_definition
+  : add
+  ;
+
+add
+  : expr '+' expr
+  ;
+  
+
