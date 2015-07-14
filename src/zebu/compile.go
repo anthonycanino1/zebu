@@ -5,21 +5,21 @@ import (
 )
 
 type Compiler struct {
-	localGrammar 	*Grammar
-	symbols				*SymTab
-	unresolved		map[*Sym]*Node
-	symscope			[]*Sym
+	localGrammar *Grammar
+	symbols      *SymTab
+	unresolved   map[*Sym]*Node
+	symscope     []*Sym
 }
 
 var cc *Compiler = nil
 
 func init() {
 	localGrammar := NewGrammar("_")
-	cc = &Compiler {
+	cc = &Compiler{
 		localGrammar: localGrammar,
-		symbols:			newSymTab(),
-		unresolved:		make(map[*Sym]*Node),
-		symscope:			make([]*Sym, 0, 5),
+		symbols:      newSymTab(),
+		unresolved:   make(map[*Sym]*Node),
+		symscope:     make([]*Sym, 0, 5),
 	}
 
 	// Populate symbol table with known symbols
@@ -27,23 +27,23 @@ func init() {
 		s := cc.symbols.lookup(syms[i].name)
 		s.lexical = syms[i].kind
 	}
-} 
+}
 
 func Compile(f string) {
 	p := NewParser()
 	tr := p.parse(f)
 	tr.dumpTree()
-} 
+}
 
 type Sym struct {
-	name 		string
-	pos			*Position
-	link		*Sym
-	gram		*Grammar
-	defn		*Node
-	defv		bool
+	name string
+	pos  *Position
+	link *Sym
+	gram *Grammar
+	defn *Node
+	defv bool
 
-	lexical	TokenKind		// lexical kind associated with this sym
+	lexical TokenKind // lexical kind associated with this sym
 }
 
 func (s *Sym) String() string {
@@ -54,22 +54,22 @@ var syms = []struct {
 	name string
 	kind TokenKind
 }{
-	{"grammar", 	GRAMMAR},
-	{"import", 		IMPORT},
-	{"keyword", 	KEYWORD},
-	{"extend",		EXTEND},
-	{"inherit",		INHERIT},
-	{"override",	OVERRIDE},
-	{"delete",		DELETE},
-	{"modify",		MODIFY},
+	{"grammar", GRAMMAR},
+	{"import", IMPORT},
+	{"keyword", KEYWORD},
+	{"extend", EXTEND},
+	{"inherit", INHERIT},
+	{"override", OVERRIDE},
+	{"delete", DELETE},
+	{"modify", MODIFY},
 }
 
 type SymTab struct {
-	table	map[string]*Sym
+	table map[string]*Sym
 }
 
 func newSymTab() (t *SymTab) {
-	t = &SymTab {
+	t = &SymTab{
 		table: make(map[string]*Sym),
 	}
 
@@ -88,12 +88,12 @@ func (t *SymTab) lookupGrammar(s string, g *Grammar) (sym *Sym) {
 	}
 
 	h := t.table[s]
-	sym = &Sym {
-		name: s,
-		pos: nil,
-		link: h,
-		gram: g,
-		lexical: NAME,	// this get's refined 
+	sym = &Sym{
+		name:    s,
+		pos:     nil,
+		link:    h,
+		gram:    g,
+		lexical: NAME, // this get's refined
 	}
 	t.table[s] = sym
 
@@ -102,23 +102,23 @@ func (t *SymTab) lookupGrammar(s string, g *Grammar) (sym *Sym) {
 
 func (t *SymTab) dump() {
 	dbg("----Table----")
-	for _,v := range t.table {
+	for _, v := range t.table {
 		for s := v; s != nil; s = s.link {
 			dbg("%s:%d", s, s.lexical)
 		}
 	}
-} 
+}
 
 type Grammar struct {
-	name	string
-} 
+	name string
+}
 
 func NewGrammar(s string) (g *Grammar) {
-	g = &Grammar {
+	g = &Grammar{
 		name: s,
 	}
 	return
-} 
+}
 
 func (g *Grammar) String() string {
 	return g.name
@@ -145,7 +145,7 @@ func declare(n *Node) {
 		delete(cc.unresolved, s)
 		s.defn.dcopy(n)
 		return
-	} 
+	}
 	s.defn = n
 	return
 }

@@ -8,14 +8,14 @@ import (
 var _ = fmt.Printf
 
 type Parser struct {
-	lexer 	*Lexer
-	lh			*Token
+	lexer *Lexer
+	lh    *Token
 }
 
 func NewParser() (p *Parser) {
 	p = &Parser{
 		lexer: nil,
-		lh: nil,
+		lh:    nil,
 	}
 
 	return
@@ -29,7 +29,7 @@ func (p *Parser) next() (t *Token) {
 
 func (p *Parser) match(k TokenKind) (t *Token) {
 	if t = p.next(); t.kind != k {
-		zbError(p.lh.pos, "expected %s", k);
+		zbError(p.lh.pos, "expected %s", k)
 		t = nil
 	}
 	return
@@ -39,7 +39,7 @@ func (p *Parser) parseTermName() (s *Sym, err error) {
 	t := p.match(TERMINAL)
 	if t == nil {
 		return
-	} 
+	}
 	s = t.sym
 	return
 }
@@ -48,7 +48,7 @@ func (p *Parser) parseNontermName() (s *Sym, err error) {
 	t := p.match(NONTERMINAL)
 	if t == nil {
 		return
-	}	
+	}
 	s = t.sym
 	return
 }
@@ -85,8 +85,8 @@ func (p *Parser) parseStrlit() (n *Node, err error) {
 	if t == nil {
 		return
 	}
-	n = &Node {
-		op: OSTRLIT,
+	n = &Node{
+		op:  OSTRLIT,
 		lit: t.lit,
 	}
 	return
@@ -120,8 +120,8 @@ func (p *Parser) parseRuleDcl() (n *Node, err error) {
 	if l == nil {
 		return
 	}
-	n = &Node {
-		op: ORDCL,
+	n = &Node{
+		op:   ORDCL,
 		left: l,
 	}
 	if p.lh.kind == '=' {
@@ -137,13 +137,13 @@ func (p *Parser) parseRHS() (n *Node, err error) {
 	for {
 		nn, _ := p.parseRuleDcl()
 		if nn == nil {
-			break 
+			break
 		}
 		l = l.add(nn)
 	}
-	n = &Node {
-		op: 		ORHS,
-		llist: 	l,
+	n = &Node{
+		op:    ORHS,
+		llist: l,
 	}
 	popsyms()
 	return
@@ -186,7 +186,7 @@ func (p *Parser) parseRule() (n *Node, err error) {
 
 	rl, _ := p.parseRHSList()
 	if rl == nil {
-		return	
+		return
 	}
 
 	n.rlist = rl
@@ -213,12 +213,12 @@ func (p *Parser) parseDecl() (n *Node, err error) {
 }
 
 func (p *Parser) parseGrammar() (n *Node, err error) {
-	if (p.match(GRAMMAR) == nil) {
+	if p.match(GRAMMAR) == nil {
 		return
 	}
 
 	s, _ := p.parseTermName()
-	if (s == nil) {
+	if s == nil {
 		return
 	}
 
@@ -245,7 +245,7 @@ func (p *Parser) parse(f string) (l *Node) {
 	// Let the parse create a lexer for this file
 	var err error
 	p.lexer, err = NewLexer(f)
-	if (err != nil) {
+	if err != nil {
 		panic("could not open file")
 	}
 

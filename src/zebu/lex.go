@@ -1,16 +1,16 @@
 package zebu
 
 import (
-	"os"
 	"bufio"
 	"fmt"
+	"os"
 )
 
 type TokenKind int
 
 // The list of tokens
 const (
-	EOF = iota
+	EOF     = iota
 	UNKNOWN = 0 - iota
 
 	// Literal tokens
@@ -31,42 +31,42 @@ const (
 	OVERRIDE
 	DELETE
 	MODIFY
-) 
+)
 
-var tokenLabels = map[TokenKind]string {
-	EOF:"eof",
+var tokenLabels = map[TokenKind]string{
+	EOF: "eof",
 
-	NAME:"name",
-	TERMINAL:"terminal",
-	NONTERMINAL:"nonterminal",
-	VARID:"varid",
-	CHARLIT:"charlit",
-	STRLIT:"strlit",
-	REGLIT:"reglit",
+	NAME:        "name",
+	TERMINAL:    "terminal",
+	NONTERMINAL: "nonterminal",
+	VARID:       "varid",
+	CHARLIT:     "charlit",
+	STRLIT:      "strlit",
+	REGLIT:      "reglit",
 
 	// Keyword tokens
-	GRAMMAR:"grammar",
-	IMPORT:"import",
-	KEYWORD:"keyword",
-	EXTEND:"extend",
-	INHERIT:"inherit",
-	OVERRIDE:"override",
-	DELETE:"delete",
-	MODIFY:"modify", 
-}	
+	GRAMMAR:  "grammar",
+	IMPORT:   "import",
+	KEYWORD:  "keyword",
+	EXTEND:   "extend",
+	INHERIT:  "inherit",
+	OVERRIDE: "override",
+	DELETE:   "delete",
+	MODIFY:   "modify",
+}
 
 func (k TokenKind) String() string {
 	if int(k) < len(tokenLabels) {
-		return tokenLabels[k];
+		return tokenLabels[k]
 	} else {
 		return string(k)
 	}
 }
 
 type Position struct {
-	file 	string
-	line	int
-	col		int
+	file string
+	line int
+	col  int
 }
 
 func (p *Position) String() string {
@@ -74,13 +74,13 @@ func (p *Position) String() string {
 }
 
 type Token struct {
-	pos 	*Position
-	kind 	TokenKind
+	pos  *Position
+	kind TokenKind
 
 	// Simulating a union
-	lit 	string
-	byt		byte
-	sym		*Sym
+	lit string
+	byt byte
+	sym *Sym
 }
 
 func (t *Token) String() string {
@@ -100,7 +100,7 @@ func (t *Token) String() string {
 
 func (t *Token) isSym() bool {
 	switch t.kind {
-	case NAME: case TERMINAL: case NONTERMINAL:
+	case NAME, TERMINAL, NONTERMINAL:
 		return true
 	}
 	return false
@@ -115,40 +115,40 @@ const (
 
 type Lexer struct {
 	// State based on current loaded file
-	fileName 	string
-	file			*os.File		
-	buf				*bufio.Reader
+	fileName string
+	file     *os.File
+	buf      *bufio.Reader
 
-	mode			LexerMode
-	line			int
-	col				int
+	mode LexerMode
+	line int
+	col  int
 
 	// Current char peeked by the lexer
-	ch				byte
-	ch1				byte
+	ch  byte
+	ch1 byte
 }
 
 func NewLexer(fileName string) (l *Lexer, err error) {
 	var file *os.File = nil
 	var buf *bufio.Reader = nil
-	
-	file, err = os.Open(fileName)	
-	if (err != nil) {
+
+	file, err = os.Open(fileName)
+	if err != nil {
 		return
 	}
-	
+
 	buf = bufio.NewReader(file)
 
 	err = nil
 	l = &Lexer{
 		fileName: fileName,
-		file:			file,
-		buf:			buf,
-		mode:			Normal,
-		line:			1,
-		col:			0,
-		ch:				0,
-		ch1:			0,
+		file:     file,
+		buf:      buf,
+		mode:     Normal,
+		line:     1,
+		col:      0,
+		ch:       0,
+		ch1:      0,
 	}
 
 	return
@@ -158,7 +158,7 @@ func (l *Lexer) getc() {
 	var err error
 	switch l.ch1 {
 	case 0:
-		l.ch, err =  l.buf.ReadByte()
+		l.ch, err = l.buf.ReadByte()
 		if err != nil {
 			l.ch = 0
 			return
@@ -241,17 +241,17 @@ func (l *Lexer) Next() (t *Token) {
 	var ep int
 	var lxbuf [512]byte
 	var b byte
-	
+
 lex_whitespace:
 	l.getc()
 	if isWhitespace(l.ch) {
 		goto lex_whitespace
-	} 
+	}
 
-	t.pos = &Position {
+	t.pos = &Position{
 		file: l.fileName,
 		line: l.line,
-		col:	l.col,
+		col:  l.col,
 	}
 
 	// Let's keep mode handling as the prefix to all lexing (minus whitespace)
@@ -300,7 +300,7 @@ lex_begin:
 
 	case '/':
 		l.getc()
-		if (l.ch != '*') {
+		if l.ch != '*' {
 			l.putc(l.ch)
 			l.ch = '*'
 			break
@@ -324,7 +324,6 @@ lex_begin:
 	t.byt = l.ch
 	goto lex_out
 
-
 lex_alpha:
 	for {
 		if cp+10 >= ep {
@@ -333,10 +332,10 @@ lex_alpha:
 		l.getc()
 		if !isAlphanum(l.ch) {
 			l.putc(l.ch)
-			break;
+			break
 		}
-		lxbuf[cp] = l.ch;
-		cp++;
+		lxbuf[cp] = l.ch
+		cp++
 	}
 	t.sym = cc.symbols.lookup(string(lxbuf[:cp]))
 	t.kind = t.sym.lexical
@@ -358,7 +357,7 @@ lex_alpha:
 lex_regex:
 	b = regEscape(l.ch)
 	switch {
-	} 
+	}
 	t.kind = REGLIT
 	t.byt = b
 	goto lex_out

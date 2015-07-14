@@ -8,8 +8,8 @@ const (
 	OXXX = iota
 	ONONAME
 
-	OGRAM 
-	ORULE 
+	OGRAM
+	ORULE
 	OTYPE
 	ORHS
 	OREGDEF
@@ -19,38 +19,38 @@ const (
 
 type NodeOp int
 
-var nodeOpLabels = map[NodeOp]string {
-	OXXX:"oxxx",
+var nodeOpLabels = map[NodeOp]string{
+	OXXX:    "oxxx",
 	ONONAME: "ononame",
-	OGRAM: "ogram",
-	ORULE: "orule",
-	ORHS: "orhs",
+	OGRAM:   "ogram",
+	ORULE:   "orule",
+	ORHS:    "orhs",
 	OREGDEF: "oregdef",
 	OSTRLIT: "ostrlit",
-	ORDCL: "ordcl",
+	ORDCL:   "ordcl",
 }
 
-func (n NodeOp) String() (string) {
+func (n NodeOp) String() string {
 	return nodeOpLabels[n]
 }
 
 type Node struct {
 	// Node shape
-	left 	*Node
+	left  *Node
 	right *Node
 	llist *NodeList
-	rlist	*NodeList
+	rlist *NodeList
 	typ   *Node
 
 	// Common
-	op		NodeOp
-	dump 	bool
+	op   NodeOp
+	dump bool
 
-	sym		*Sym
-	lit		string
+	sym *Sym
+	lit string
 
 	// ORDCL
-	svar	*Sym
+	svar *Sym
 }
 
 func NewNode(op NodeOp, l *Node, r *Node) (n *Node) {
@@ -80,9 +80,9 @@ func (n *Node) dcopy(c *Node) *Node {
 }
 
 type NodeList struct {
-	n			*Node
-	next 	*NodeList	
-	tail 	*NodeList
+	n    *Node
+	next *NodeList
+	tail *NodeList
 }
 
 func (l *NodeList) concat(r *NodeList) *NodeList {
@@ -106,8 +106,8 @@ func (l *NodeList) add(n *Node) *NodeList {
 
 // Stuff related to dcls, here for now
 func newname(s *Sym) *Node {
-	return &Node {
-		op: ONONAME,
+	return &Node{
+		op:  ONONAME,
 		sym: s,
 	}
 }
@@ -129,7 +129,7 @@ func oldname(s *Sym) (n *Node) {
 
 // Just for dumping the tree right now
 type Writer struct {
-	ind		int
+	ind   int
 	onlin bool
 }
 
@@ -158,7 +158,7 @@ func (w *Writer) doInd() {
 }
 
 func (w *Writer) write(f string, args ...interface{}) {
-	w.doInd()	
+	w.doInd()
 	fmt.Printf(f, args...)
 }
 
@@ -231,5 +231,3 @@ func walkdump(n *Node, w *Writer) {
 		break
 	}
 }
-
-
