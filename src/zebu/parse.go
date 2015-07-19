@@ -51,58 +51,7 @@ func (p *Parser) parseNontermName() (s *Sym, err error) {
 	}
 	s = t.sym
 	return
-}
-
-func (p *Parser) parseLHS() (n *Node, err error) {
-	s, _ := p.parseTermName()
-	if s == nil {
-		return
-	}
-	n = newname(s)
-	return
-}
-
-func (p *Parser) parseTerm() (n *Node, err error) {
-	s, _ := p.parseTermName()
-	if s == nil {
-		return
-	}
-	n = oldname(s)
-	return
-}
-
-func (p *Parser) parseNonterm() (n *Node, err error) {
-	s, _ := p.parseNontermName()
-	if s == nil {
-		return
-	}
-	n = oldname(s)
-	return
-}
-
-func (p *Parser) parseStrlit() (n *Node, err error) {
-	t := p.match(STRLIT)
-	if t == nil {
-		return
-	}
-	n = &Node{
-		op:  OSTRLIT,
-		lit: t.lit,
-	}
-	return
-}
-
-func (p *Parser) parseVarId() (s *Sym, err error) {
-	t := p.match(VARID)
-	if t == nil {
-		return
-	}
-	s = t.sym
-	if !pushsym(s) {
-		return
-	}
-	return
-}
+} 
 
 func (p *Parser) parseAction() (n *Node, err error) {
 	p.match('{')
@@ -131,10 +80,52 @@ func (p *Parser) parseAction() (n *Node, err error) {
 	return
 }
 
+func (p *Parser) parseVarId() (s *Sym, err error) {
+	t := p.match(VARID)
+	if t == nil {
+		return
+	}
+	s = t.sym
+	if !pushsym(s) {
+		return
+	}
+	return
+} 
+
 func (p *Parser) parseEpsilon() (n *Node, err error) {
 	n = &Node {
 		op: OEPSILON,
 	}
+	return
+}
+
+func (p *Parser) parseStrlit() (n *Node, err error) {
+	t := p.match(STRLIT)
+	if t == nil {
+		return
+	}
+	n = &Node{
+		op:  OSTRLIT,
+		lit: t.lit,
+	}
+	return
+}
+
+func (p *Parser) parseNonterm() (n *Node, err error) {
+	s, _ := p.parseNontermName()
+	if s == nil {
+		return
+	}
+	n = oldname(s)
+	return
+}
+
+func (p *Parser) parseTerm() (n *Node, err error) {
+	s, _ := p.parseTermName()
+	if s == nil {
+		return
+	}
+	n = oldname(s)
 	return
 }
 
@@ -234,6 +225,15 @@ func (p *Parser) parseType() (n *Node, err error) {
 	return
 }
 
+func (p *Parser) parseLHS() (n *Node, err error) {
+	s, _ := p.parseTermName()
+	if s == nil {
+		return
+	}
+	n = newname(s)
+	return
+} 
+
 func (p *Parser) parseRule() (n *Node, err error) {
 	if n, _ = p.parseLHS(); n == nil {
 		return
@@ -242,7 +242,6 @@ func (p *Parser) parseRule() (n *Node, err error) {
 	declare(n)
 
 	if p.lh.kind == '=' {
-		// type decl
 		p.match('=')
 		n.ntype, _ = p.parseType()
 	}
@@ -265,13 +264,10 @@ func (p *Parser) parseDecl() (n *Node, err error) {
 	switch p.lh.kind {
 	case TERMINAL:
 		n, err = p.parseRule()
-		break
 	case NONTERMINAL:
 		n, err = p.parseRegex()
-		break
 	default:
 		zbError(p.lh.pos, "expected terminal or nonterminal declaration, found %s", p.lh)
-		break
 	}
 	return
 }
@@ -286,7 +282,9 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 		return
 	}
 
-	n = NewNode(OGRAM, nil, nil)
+	n = &Node {
+		op: OGRAM,
+	}
 	n.sym = s
 	//declare(n)
 

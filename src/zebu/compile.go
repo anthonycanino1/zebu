@@ -4,36 +4,6 @@ import (
 	"fmt"
 )
 
-type Compiler struct {
-	localGrammar *Grammar
-	symbols      *SymTab
-	unresolved   map[*Sym]*Node
-	symscope     *SymList
-}
-
-var cc *Compiler = nil
-
-func init() {
-	localGrammar := NewGrammar("_")
-	cc = &Compiler{
-		localGrammar: localGrammar,
-		symbols:      newSymTab(),
-		unresolved:   make(map[*Sym]*Node),
-	}
-
-	// Populate symbol table with known symbols
-	for i := 0; i < len(syms); i++ {
-		s := cc.symbols.lookup(syms[i].name)
-		s.lexical = syms[i].kind
-	}
-}
-
-func Compile(f string) {
-	p := NewParser()
-	tr := p.parse(f)
-	tr.dumpTree()
-}
-
 type Sym struct {
 	name string
 	pos  *Position
@@ -94,7 +64,7 @@ func (l *SymList) add(s *Sym) *SymList {
 		l.tail = l
 	}
 	return l
-} 
+}
 
 type SymTab struct {
 	table map[string]*Sym
@@ -108,6 +78,8 @@ func newSymTab() (t *SymTab) {
 	return
 }
 
+// TODO : Might want to move this from a global function to operate
+// directly on the Compiler type
 func (t *SymTab) lookup(s string) *Sym {
 	return t.lookupGrammar(s, cc.localGrammar)
 }
@@ -133,10 +105,10 @@ func (t *SymTab) lookupGrammar(s string, g *Grammar) (sym *Sym) {
 }
 
 func (t *SymTab) dump() {
-	dbg("----Table----")
+	fmt.Printf("----Table----")
 	for _, v := range t.table {
 		for s := v; s != nil; s = s.link {
-			dbg("%s:%d", s, s.lexical)
+			fmt.Printf("%s:%d", s, s.lexical)
 		}
 	}
 }
@@ -156,11 +128,58 @@ func (g *Grammar) String() string {
 	return g.name
 }
 
-func zbError(p *Position, m string, args ...interface{}) {
-	fmt.Printf("%s: %s\n", p, fmt.Sprintf(m, args...))
+type Compiler struct {
+	localGrammar *Grammar
+	symbols      *SymTab
+	unresolved   map[*Sym]*Node
+	symscope     *SymList
 }
 
-// dcl
+var cc *Compiler = nil
+
+func init() {
+	localGrammar := NewGrammar("_")
+	cc = &Compiler{
+		localGrammar: localGrammar,
+		symbols:      newSymTab(),
+		unresolved:   make(map[*Sym]*Node),
+	}
+
+	// Populate symbol table with known symbols
+	for i := 0; i < len(syms); i++ {
+		s := cc.symbols.lookup(syms[i].name)
+		s.lexical = syms[i].kind
+	}
+}
+
+func Compile(f string) {
+	p := NewParser()
+	tr := p.parse(f)
+	tr.dumpTree()
+}
+
+// Stuff related to dcls, here for now
+func newname(s *Sym) *Node {
+	return &Node{
+		op:  ONONAME,
+		sym: s,
+	}
+}
+
+func oldname(s *Sym) (n *Node) {
+	if s.defn == nil {
+		// Since we have no notion of scope, we will use a trick
+		// Declare a dummy node that all future reference will point to
+		// for the symbol.
+		// Resolve at the end.
+		n = newname(s)
+		declare(n)
+		cc.unresolved[s] = n
+		return
+	}
+	n = s.defn
+	return
+}
 
 func declare(n *Node) {
 	s := n.sym
@@ -207,4 +226,9 @@ func popsyms() {
 		l.s.defv = false
 	}
 	cc.symscope = nil
+}
+
+
+func zbError(p *Position, m string, args ...interface{}) {
+	fmt.Printf("%s: %s\n", p, fmt.Sprintf(m, args...))
 }

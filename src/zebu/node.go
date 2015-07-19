@@ -114,29 +114,6 @@ func (l *NodeList) add(n *Node) *NodeList {
 	return l
 }
 
-// Stuff related to dcls, here for now
-func newname(s *Sym) *Node {
-	return &Node{
-		op:  ONONAME,
-		sym: s,
-	}
-}
-
-func oldname(s *Sym) (n *Node) {
-	if s.defn == nil {
-		// Since we have no notion of scope, we will use a trick
-		// Declare a dummy node that all future reference will point to
-		// for the symbol.
-		// Resolve at the end.
-		n = newname(s)
-		declare(n)
-		cc.unresolved[s] = n
-		return
-	}
-	n = s.defn
-	return
-}
-
 // Just for dumping the tree right now
 type Writer struct {
 	ind   int
