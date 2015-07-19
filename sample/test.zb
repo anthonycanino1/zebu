@@ -32,9 +32,22 @@ program
   : regular_definitions
   ;
 
-regular_definitions
+regular_definitions=*NodeList
   : regular_definition=$1
+		{
+			func pushsym(s *Sym) bool {
+				if s.defv {
+					fmt.Printf("multiply defined varid %s\n", s)
+					return false
+				}
+				cc.symscope = cc.symscope.add(s)
+				s.defv = true
+				return true
+			}
+		}
   | regular_definition=$1 regular_definitions=$2
+		{
+		}
   ;
 
 regular_definition
@@ -44,5 +57,10 @@ regular_definition
 add
   : expr '+' expr
   ;
+
+oadd
+	: 
+	| add
+	;
   
 

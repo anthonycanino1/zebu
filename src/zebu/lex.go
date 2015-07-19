@@ -78,9 +78,10 @@ type Token struct {
 	kind TokenKind
 
 	// Simulating a union
-	lit string
-	byt byte
-	sym *Sym
+	lit  string
+	byt  byte
+	sym  *Sym
+	code []byte
 }
 
 func (t *Token) String() string {
@@ -235,6 +236,12 @@ func (l *Lexer) strEscape() byte {
 	}
 }
 
+func (l *Lexer) Raw() byte {
+	c := l.ch
+	l.getc()
+	return c
+}
+
 func (l *Lexer) Next() (t *Token) {
 	t = new(Token)
 	var cp int
@@ -319,6 +326,7 @@ lex_begin:
 		}
 		goto lex_whitespace
 	}
+
 	// This is meant to be the default
 	t.kind = TokenKind(l.ch)
 	t.byt = l.ch
@@ -374,6 +382,7 @@ lex_strlit:
 	}
 	t.kind = STRLIT
 	t.lit = string(lxbuf[:cp])
+	goto lex_out
 
 lex_out:
 	return t

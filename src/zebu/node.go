@@ -15,19 +15,22 @@ const (
 	OREGDEF
 	OSTRLIT
 	ORDCL
+	OACTION
+	OEPSILON
 )
 
 type NodeOp int
 
 var nodeOpLabels = map[NodeOp]string{
-	OXXX:    "oxxx",
-	ONONAME: "ononame",
-	OGRAM:   "ogram",
-	ORULE:   "orule",
-	ORHS:    "orhs",
-	OREGDEF: "oregdef",
-	OSTRLIT: "ostrlit",
-	ORDCL:   "ordcl",
+	OXXX:     "oxxx",
+	ONONAME:  "ononame",
+	OGRAM:    "ogram",
+	ORULE:    "orule",
+	ORHS:     "orhs",
+	OREGDEF:  "oregdef",
+	OSTRLIT:  "ostrlit",
+	ORDCL:    "ordcl",
+	OEPSILON: "oepsilon",
 }
 
 func (n NodeOp) String() string {
@@ -40,7 +43,7 @@ type Node struct {
 	right *Node
 	llist *NodeList
 	rlist *NodeList
-	typ   *Node
+	ntype *Node
 
 	// Common
 	op   NodeOp
@@ -51,6 +54,9 @@ type Node struct {
 
 	// ORDCL
 	svar *Sym
+
+	// OACTION
+	code []byte
 }
 
 func NewNode(op NodeOp, l *Node, r *Node) (n *Node) {
@@ -59,6 +65,10 @@ func NewNode(op NodeOp, l *Node, r *Node) (n *Node) {
 	n.left = l
 	n.right = r
 	return n
+}
+
+func (n *Node) String() string {
+	return fmt.Sprintf("(Node: %s)\n", n.op)
 }
 
 func (n *Node) list() *NodeList {
@@ -196,7 +206,12 @@ func walkdump(n *Node, w *Writer) {
 		w.writeln(")")
 		w.exit()
 	case ORULE:
-		w.writeln("(RULE: %s", n.sym)
+		w.write("(RULE: %s", n.sym)
+		if n.ntype != nil {
+			nn := n.ntype
+			w.write(" -- TYPE: %s", string(nn.code))
+		}
+		w.newline()
 		w.enter()
 
 		for l := n.rlist; l != nil; l = l.next {
@@ -216,9 +231,14 @@ func walkdump(n *Node, w *Writer) {
 				w.write("(TERMINAL: %s)", nn.left.sym)
 			case OSTRLIT:
 				w.write("(STRLIT: %s)", nn.left.lit)
+			case OEPSILON:
+				w.write("(EPSILON)")
 			}
 			if nn.svar != nil {
 				w.write("=%s", nn.svar)
+			}
+			if nn.right != nil {
+				w.write(" {ACTION}")
 			}
 			w.newline()
 		}

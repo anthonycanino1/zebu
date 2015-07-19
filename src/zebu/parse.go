@@ -104,29 +104,69 @@ func (p *Parser) parseVarId() (s *Sym, err error) {
 	return
 }
 
-// LAST : Was working on parsing symvars
+func (p *Parser) parseAction() (n *Node, err error) {
+	p.match('{')
+	lvl := 0
+	codebuf := make([]byte, 512)
+	for {
+		c := p.lexer.Raw()
+		if c == '}' && lvl == 0 {
+			break
+		}
+		if c == '{' {
+			lvl++
+		} else if c == '}' {
+			lvl--
+		}
+		codebuf = append(codebuf, c)
+	}
+	// Reset the lh token
+	p.next()
+
+	n = &Node{
+		op:   OACTION,
+		code: codebuf,
+	}
+
+	return
+}
+
+func (p *Parser) parseEpsilon() (n *Node, err error) {
+	n = &Node {
+		op: OEPSILON,
+	}
+	return
+}
+
 func (p *Parser) parseRuleDcl() (n *Node, err error) {
-	var l *Node
+	var nn *Node
 	switch p.lh.kind {
 	case TERMINAL:
-		l, _ = p.parseTerm()
+		nn, _ = p.parseTerm()
 
 	case NONTERMINAL:
-		l, _ = p.parseNonterm()
+		nn, _ = p.parseNonterm()
 
 	case STRLIT:
-		l, _ = p.parseStrlit()
+		nn, _ = p.parseStrlit()
+
+	case '|', '{':
+		nn, _ = p.parseEpsilon()
+
 	}
-	if l == nil {
+	if nn == nil {
 		return
 	}
 	n = &Node{
 		op:   ORDCL,
-		left: l,
+		left: nn,
 	}
 	if p.lh.kind == '=' {
 		p.match('=')
 		n.svar, _ = p.parseVarId()
+	}
+	if p.lh.kind == '{' {
+		n.right, _ = p.parseAction()
 	}
 	return
 }
@@ -140,6 +180,9 @@ func (p *Parser) parseRHS() (n *Node, err error) {
 			break
 		}
 		l = l.add(nn)
+		if p.lh.kind == '|' {
+			break
+		}
 	}
 	n = &Node{
 		op:    ORHS,
@@ -167,6 +210,27 @@ func (p *Parser) parseRHSList() (l *NodeList, err error) {
 // Let's do some semantic analysis here, check that
 // a type is actually a valid go type.
 func (p *Parser) parseType() (n *Node, err error) {
+	// For now, just grab the raw string
+	typ := make([]byte, 10, 10)
+	for {
+		c := p.lexer.Raw()
+		if c == ':' {
+			break
+		}
+		if isWhitespace(c) {
+			continue
+		}
+		typ = append(typ, c)
+	}
+
+	p.lexer.putc(':')
+	p.next()
+
+	n = &Node {
+		op: OTYPE,
+		code: typ,
+	}
+
 	return
 }
 
@@ -180,7 +244,7 @@ func (p *Parser) parseRule() (n *Node, err error) {
 	if p.lh.kind == '=' {
 		// type decl
 		p.match('=')
-		n.typ, _ = p.parseType()
+		n.ntype, _ = p.parseType()
 	}
 	p.match(':')
 

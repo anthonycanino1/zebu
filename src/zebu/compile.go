@@ -8,7 +8,7 @@ type Compiler struct {
 	localGrammar *Grammar
 	symbols      *SymTab
 	unresolved   map[*Sym]*Node
-	symscope     []*Sym
+	symscope     *SymList
 }
 
 var cc *Compiler = nil
@@ -19,7 +19,6 @@ func init() {
 		localGrammar: localGrammar,
 		symbols:      newSymTab(),
 		unresolved:   make(map[*Sym]*Node),
-		symscope:     make([]*Sym, 0, 5),
 	}
 
 	// Populate symbol table with known symbols
@@ -50,6 +49,14 @@ func (s *Sym) String() string {
 	return s.name
 }
 
+func (s *Sym) list() *SymList {
+	sl := new(SymList)
+	sl.s = s
+	sl.next = nil
+	sl.tail = sl
+	return sl
+}
+
 var syms = []struct {
 	name string
 	kind TokenKind
@@ -63,6 +70,31 @@ var syms = []struct {
 	{"delete", DELETE},
 	{"modify", MODIFY},
 }
+
+type SymList struct {
+	s    *Sym
+	next *SymList
+	tail *SymList
+}
+
+func (l *SymList) concat(r *SymList) *SymList {
+	l.tail.next = r
+	l.tail = r.tail
+	return l
+}
+
+func (l *SymList) add(s *Sym) *SymList {
+	if s == nil {
+		return l
+	}
+	if l.s != nil {
+		return l.concat(s.list())
+	} else {
+		l.s = s
+		l.tail = l
+	}
+	return l
+} 
 
 type SymTab struct {
 	table map[string]*Sym
@@ -151,9 +183,10 @@ func declare(n *Node) {
 }
 
 func marksyms() {
-	if len(cc.symscope) != 0 {
+	if cc.symscope != nil {
 		panic("marking should always start with empty symscope")
 	}
+	cc.symscope = new(SymList)
 }
 
 func pushsym(s *Sym) bool {
@@ -161,15 +194,17 @@ func pushsym(s *Sym) bool {
 		fmt.Printf("multiply defined varid %s\n", s)
 		return false
 	}
-	cc.symscope = append(cc.symscope, s)
+	cc.symscope = cc.symscope.add(s)
 	s.defv = true
 	return true
 }
 
 func popsyms() {
-	for i := 0; i < len(cc.symscope); i++ {
-		s := cc.symscope[i]
-		s.defv = false
+	for l := cc.symscope; l != nil; l = l.next {
+		if l.s == nil {
+			continue
+		}
+		l.s.defv = false
 	}
-	cc.symscope = cc.symscope[:0]
+	cc.symscope = nil
 }
