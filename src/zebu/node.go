@@ -10,13 +10,22 @@ const (
 
 	OGRAM
 	ORULE
-	OTYPE
 	ORHS
-	OREGDEF
-	OSTRLIT
 	ORDCL
+	OSTRLIT
+	OTYPE
 	OACTION
 	OEPSILON
+
+	OREGDEF
+	OCAT
+	OALT
+	OKLEENE
+	OPLUS
+	OREPEAT
+	OCLASS
+	ORANGE
+	OCHAR
 )
 
 type NodeOp int
@@ -30,6 +39,8 @@ var nodeOpLabels = map[NodeOp]string{
 	OREGDEF:  "oregdef",
 	OSTRLIT:  "ostrlit",
 	ORDCL:    "ordcl",
+	OTYPE:    "otype",
+	OACTION:  "oaction",
 	OEPSILON: "oepsilon",
 }
 
@@ -57,6 +68,10 @@ type Node struct {
 
 	// OACTION
 	code []byte
+
+	// OREPEAT
+	lb int
+	ub int
 }
 
 func NewNode(op NodeOp, l *Node, r *Node) (n *Node) {
@@ -167,7 +182,16 @@ func (n *Node) dumpTree() {
 }
 
 func walkdump(n *Node, w *Writer) {
-	if n == nil || n.dump {
+	if n == nil {
+		return
+	}
+	if n.dump {
+		switch n.op {
+		case ORULE:
+			w.writeln("(TERMINAL: %s)", n.sym)
+		case OREGDEF:
+			w.writeln("(NONTERMINAL: %s)", n.sym)
+		}
 		return
 	}
 	n.dump = true
@@ -180,6 +204,40 @@ func walkdump(n *Node, w *Writer) {
 			walkdump(l.n, w)
 		}
 
+		w.writeln(")")
+		w.exit()
+	case OREGDEF:
+		w.writeln("(REGDEF: %s", n.sym)
+		w.enter()
+		walkdump(n.left, w)
+		w.writeln(")")
+		w.exit()
+	case OCAT:
+		w.writeln("(OCAT")
+		w.enter()
+		walkdump(n.left, w)
+		walkdump(n.right, w)
+		w.writeln(")")
+		w.exit()
+	case OALT:
+		w.writeln("(OALT")
+		w.enter()
+		walkdump(n.left, w)
+		walkdump(n.right, w)
+		w.writeln(")")
+		w.exit()
+	case OKLEENE, OPLUS:
+		w.writeln("(OKLEENE")
+		w.enter()
+		walkdump(n.left, w)
+		w.writeln(")")
+		w.exit()
+	case OREPEAT:
+		w.writeln("(OREPEAT")
+		w.enter()
+		walkdump(n.left, w)
+		w.writeln("(LOW BOUND: %d)", n.lb)
+		w.writeln("(UP BOUND: %d)", n.ub)
 		w.writeln(")")
 		w.exit()
 	case ORULE:
@@ -202,19 +260,12 @@ func walkdump(n *Node, w *Writer) {
 		w.enter()
 
 		for l := n.llist; l != nil; l = l.next {
-			nn := l.n
-			switch nn.left.op {
-			case ORULE:
-				w.write("(TERMINAL: %s)", nn.left.sym)
-			case OSTRLIT:
-				w.write("(STRLIT: %s)", nn.left.lit)
-			case OEPSILON:
-				w.write("(EPSILON)")
+			n1 := l.n
+			walkdump(n1, w)
+			if n1.svar != nil {
+				w.write("=%s", n1.svar)
 			}
-			if nn.svar != nil {
-				w.write("=%s", nn.svar)
-			}
-			if nn.right != nil {
+			if n1.right != nil {
 				w.write(" {ACTION}")
 			}
 			w.newline()
@@ -224,6 +275,8 @@ func walkdump(n *Node, w *Writer) {
 		w.exit()
 	case OSTRLIT:
 		w.writeln("(STRLIT: %s)", n.lit)
+	case OEPSILON:
+		w.writeln("(EPSILON)")
 	default:
 		break
 	}

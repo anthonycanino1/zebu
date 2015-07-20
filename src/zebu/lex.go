@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 )
 
 type TokenKind int
@@ -21,6 +22,7 @@ const (
 	CHARLIT
 	STRLIT
 	REGLIT
+	NUMLIT
 
 	// Keyword tokens
 	GRAMMAR
@@ -79,6 +81,7 @@ type Token struct {
 
 	// Simulating a union
 	lit  string
+	nval int
 	byt  byte
 	sym  *Sym
 	code []byte
@@ -298,7 +301,7 @@ lex_begin:
 		lxbuf[0] = l.ch
 		cp = 1
 		ep = 512
-		//goto lex_num
+		goto lex_num
 	}
 
 	switch l.ch {
@@ -360,6 +363,23 @@ lex_alpha:
 			panic("non matching alpha sym")
 		}
 	}
+	goto lex_out
+
+lex_num:
+	for {
+		if cp+10 >= ep {
+			panic("number too long")
+		}
+		l.getc()
+		if !isNum(l.ch) {
+			l.putc(l.ch)
+			break
+		}
+		lxbuf[cp] = l.ch
+		cp++
+	}
+	t.kind = NUMLIT
+	t.nval, _ = strconv.Atoi(string(lxbuf[:cp]))
 	goto lex_out
 
 lex_regex:
