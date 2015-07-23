@@ -133,6 +133,31 @@ type Compiler struct {
 	symbols      *SymTab
 	unresolved   map[*Sym]*Node
 	symscope     *SymList
+	errors       []*CCError
+}
+
+type CCError struct {
+	pos *Position
+	msg string
+}
+
+func (ce *CCError) Error() string {
+	return ce.msg
+}
+
+func (c *Compiler) error(p *Position, msg string, args ...interface{}) (ce *CCError) {
+	ce = &CCError{
+		pos: p,
+		msg: fmt.Sprintf(msg, args...),
+	}
+	c.errors = append(c.errors, ce)
+	return
+}
+
+func (c *Compiler) flushErrors() {
+	for i := 0; i < len(c.errors); i++ {
+		fmt.Printf("%s:%s\n", c.errors[i].pos, c.errors[i].msg)
+	}
 }
 
 var cc *Compiler = nil
@@ -143,6 +168,7 @@ func init() {
 		localGrammar: localGrammar,
 		symbols:      newSymTab(),
 		unresolved:   make(map[*Sym]*Node),
+		errors:       make([]*CCError, 0, 10),
 	}
 
 	// Populate symbol table with known symbols
@@ -155,6 +181,7 @@ func init() {
 func Compile(f string) {
 	p := NewParser()
 	tr := p.parse(f)
+	cc.flushErrors()
 	tr.dumpTree()
 }
 
@@ -208,14 +235,14 @@ func marksyms() {
 	cc.symscope = new(SymList)
 }
 
-func pushsym(s *Sym) bool {
+func pushsym(s *Sym) (err error) {
 	if s.defv {
-		fmt.Printf("multiply defined varid %s\n", s)
-		return false
+		//cc.error("multiply defined varid %s", s)
+		return fmt.Errorf("multiply defined varid %s", s)
 	}
 	cc.symscope = cc.symscope.add(s)
 	s.defv = true
-	return true
+	return
 }
 
 func popsyms() {
@@ -226,9 +253,4 @@ func popsyms() {
 		l.s.defv = false
 	}
 	cc.symscope = nil
-}
-
-
-func zbError(p *Position, m string, args ...interface{}) {
-	fmt.Printf("%s: %s\n", p, fmt.Sprintf(m, args...))
 }

@@ -1,8 +1,8 @@
 grammar regular_definition;
 
+/*
 One : Two | 'two' * ;
 
-/*
 EscapeCharacter : '\\' . ;
 ZebuCharacter   : EscapeCharacter | [^\\] ;
 
@@ -28,6 +28,7 @@ TokLBrack       : '['  ;
 TokRBrack       : ']'  ;
 TokRange        : '-'  ;
 TokAt           : '@'  ;
+*/
 
 program
   : regular_definitions
@@ -59,10 +60,9 @@ add
   : expr '+' expr
   ;
 
+/*
 oadd
 	: 
 	| add
 	;
-  
-
-*/
+	*/

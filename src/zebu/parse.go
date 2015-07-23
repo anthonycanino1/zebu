@@ -26,17 +26,17 @@ func (p *Parser) next() (t *Token) {
 	return
 }
 
-func (p *Parser) match(k TokenKind) (t *Token) {
+func (p *Parser) match(k TokenKind) (t *Token, err error) {
 	if t = p.next(); t.kind != k {
-		zbError(p.lh.pos, "expected %s", k)
 		t = nil
+		err = cc.error(p.lh.pos, "expected %s", k)
 	}
 	return
 }
 
 func (p *Parser) parseTermName() (s *Sym, err error) {
-	t := p.match(TERMINAL)
-	if t == nil {
+	t, err := p.match(TERMINAL)
+	if err != nil {
 		return
 	}
 	s = t.sym
@@ -44,8 +44,8 @@ func (p *Parser) parseTermName() (s *Sym, err error) {
 }
 
 func (p *Parser) parseNontermName() (s *Sym, err error) {
-	t := p.match(NONTERMINAL)
-	if t == nil {
+	t, err := p.match(NONTERMINAL)
+	if err != nil {
 		return
 	}
 	s = t.sym
@@ -56,17 +56,19 @@ func (p *Parser) parseNontermName() (s *Sym, err error) {
 func (p *Parser) parseChar() (n *Node, err error) {
 	switch p.lh.kind {
 	case NONTERMINAL:
-		s, _ := p.parseNontermName()
+		var s *Sym
+		if s, err = p.parseNontermName(); err != nil {
+			return
+		}
 		if s.defn == nil {
-			zbError(p.lh.pos, "undeclared regular definition!")
+			err = cc.error(p.lh.pos, "undeclared regular definition!")
 			return
 		}
 		n = s.defn
 	case STRLIT:
-		n, _ = p.parseStrlit()
+		n, err = p.parseStrlit()
 	default:
-		zbError(p.lh.pos, "expected regular definition or string literal, found %s", p.lh)
-		panic("can't handle")
+		err = cc.error(p.lh.pos, "expected regular definition or string literal, found %s", p.lh)
 		return
 	}
 	return
@@ -74,12 +76,21 @@ func (p *Parser) parseChar() (n *Node, err error) {
 
 func (p *Parser) parseGroup() (n *Node, err error) {
 	if p.lh.kind == '(' {
-		p.match('(')
-		n, _ = p.parseCat()
-		p.match(')')
+		_, err = p.match('(')
+		if err != nil {
+			return
+		}
+		n, err = p.parseCat()
+		if err != nil {
+			return
+		}
+		_, err = p.match(')')
+		if err != nil {
+			return
+		}
 		return
 	}
-	n, _ = p.parseChar()
+	n, err = p.parseChar()
 	return
 }
 
@@ -91,9 +102,9 @@ func (p *Parser) parseClassBody() (n *Node, err error) {
 
 func (p *Parser) parseClass() (n *Node, err error) {
 	if p.lh.kind == '[' {
-		n, _ = p.parseClassBody()
+		n, err = p.parseClassBody()
 	} else {
-		n, _ = p.parseGroup()
+		n, err = p.parseGroup()
 	}
 	return
 }
@@ -103,31 +114,36 @@ func (p *Parser) parseRepeatBody() (lb int, ub int, err error) {
 	lb = -1
 	ub = -1
 	if p.lh.kind != ',' {
-		t := p.match(NUMLIT)
-		if t == nil {
+		var t *Token
+		if t, err = p.match(NUMLIT); err != nil {
 			return
 		}
 		lb = t.nval
 	}
-	p.match(',')
+	if _, err = p.match(','); err != nil {
+		return
+	}
 	if p.lh.kind != '}' {
-		t := p.match(NUMLIT)
-		if t == nil {
+		var t *Token
+		if t, err = p.match(NUMLIT); err != nil {
 			return
 		}
 		ub = t.nval
 	}
-	p.match('}')
+	_, err = p.match('}')
 	return
 }
 
 func (p *Parser) parseRepeat() (n *Node, err error) {
-	n, _ = p.parseClass()
-	if n == nil {
+	n, err = p.parseClass()
+	if err != nil {
 		return
 	}
 	if p.lh.kind == '{' {
-		lb, ub, _ := p.parseRepeatBody()
+		var lb, ub int
+		if lb, ub, err = p.parseRepeatBody(); err != nil {
+			return
+		}
 		n = &Node{
 			op:   OREPEAT,
 			left: n,
@@ -139,19 +155,22 @@ func (p *Parser) parseRepeat() (n *Node, err error) {
 }
 
 func (p *Parser) parseKleene() (n *Node, err error) {
-	n, _ = p.parseRepeat()
-	if n == nil {
+	if n, err = p.parseRepeat(); err != nil {
 		return
 	}
 	switch p.lh.kind {
 	case '*':
-		p.match('*')
+		if _, err = p.match('*'); err != nil {
+			return
+		}
 		n = &Node{
 			op:   OKLEENE,
 			left: n,
 		}
 	case '+':
-		p.match('+')
+		if _, err = p.match('+'); err != nil {
+			return
+		}
 		n = &Node{
 			op:   OPLUS,
 			left: n,
@@ -161,8 +180,7 @@ func (p *Parser) parseKleene() (n *Node, err error) {
 }
 
 func (p *Parser) parseAlt() (n *Node, err error) {
-	n, _ = p.parseKleene()
-	if n == nil {
+	if n, err = p.parseKleene(); err != nil {
 		return
 	}
 	for {
@@ -170,7 +188,10 @@ func (p *Parser) parseAlt() (n *Node, err error) {
 			break
 		}
 		p.match('|')
-		n2, _ := p.parseKleene()
+		var n2 *Node
+		if n2, err = p.parseKleene(); err != nil {
+			return
+		}
 		n = &Node{
 			op:    OALT,
 			left:  n,
@@ -181,15 +202,18 @@ func (p *Parser) parseAlt() (n *Node, err error) {
 }
 
 func (p *Parser) parseCat() (n *Node, err error) {
-	n, _ = p.parseAlt()
-	if n == nil {
+	n, err = p.parseAlt()
+	if err != nil {
 		return
 	}
 loop:
 	for {
 		switch p.lh.kind {
 		case '(', '[', NONTERMINAL, STRLIT:
-			n2, _ := p.parseAlt()
+			var n2 *Node
+			if n2, err = p.parseAlt(); err != nil {
+				return
+			}
 			n = &Node{
 				op:    OCAT,
 				left:  n,
@@ -203,26 +227,28 @@ loop:
 }
 
 func (p *Parser) parseRegdefDcl() (n *Node, err error) {
-	n2, _ := p.parseCat()
-	if n2 == nil {
+	n2, err := p.parseCat()
+	if err != nil {
 		return
 	}
 	n = &Node{
 		op:   OREGDEF,
 		left: n2,
 	}
-	p.match(';')
 	return
 }
 
 func (p *Parser) parseRegdef() (n *Node, err error) {
-	s, _ := p.parseNontermName()
-	if s == nil {
+	s, err := p.parseNontermName()
+	if err != nil {
 		return
 	}
-	p.match(':')
-	n, _ = p.parseRegdefDcl()
-	if n == nil {
+	_, err = p.match(':')
+	if err != nil {
+		return
+	}
+	n, err = p.parseRegdefDcl()
+	if err != nil {
 		return
 	}
 	n.sym = s
@@ -231,7 +257,10 @@ func (p *Parser) parseRegdef() (n *Node, err error) {
 }
 
 func (p *Parser) parseAction() (n *Node, err error) {
-	p.match('{')
+	_, err = p.match('{')
+	if err != nil {
+		return
+	}
 	lvl := 0
 	codebuf := make([]byte, 512)
 	for {
@@ -258,14 +287,12 @@ func (p *Parser) parseAction() (n *Node, err error) {
 }
 
 func (p *Parser) parseVarId() (s *Sym, err error) {
-	t := p.match(VARID)
-	if t == nil {
+	t, err := p.match(VARID)
+	if err != nil {
 		return
 	}
 	s = t.sym
-	if !pushsym(s) {
-		return
-	}
+	err = pushsym(s) 
 	return
 }
 
@@ -277,8 +304,8 @@ func (p *Parser) parseEpsilon() (n *Node, err error) {
 }
 
 func (p *Parser) parseStrlit() (n *Node, err error) {
-	t := p.match(STRLIT)
-	if t == nil {
+	t, err := p.match(STRLIT)
+	if err != nil {
 		return
 	}
 	n = &Node{
@@ -289,8 +316,8 @@ func (p *Parser) parseStrlit() (n *Node, err error) {
 }
 
 func (p *Parser) parseNonterm() (n *Node, err error) {
-	s, _ := p.parseNontermName()
-	if s == nil {
+	s, err := p.parseNontermName()
+	if err != nil {
 		return
 	}
 	n = oldname(s)
@@ -298,8 +325,8 @@ func (p *Parser) parseNonterm() (n *Node, err error) {
 }
 
 func (p *Parser) parseTerm() (n *Node, err error) {
-	s, _ := p.parseTermName()
-	if s == nil {
+	s, err := p.parseTermName()
+	if err != nil {
 		return
 	}
 	n = oldname(s)
@@ -310,19 +337,19 @@ func (p *Parser) parseRuleDcl() (n *Node, err error) {
 	var nn *Node
 	switch p.lh.kind {
 	case TERMINAL:
-		nn, _ = p.parseTerm()
+		nn, err = p.parseTerm()
 
 	case NONTERMINAL:
-		nn, _ = p.parseNonterm()
+		nn, err = p.parseNonterm()
 
 	case STRLIT:
-		nn, _ = p.parseStrlit()
+		nn, err = p.parseStrlit()
 
 	case '|', '{':
-		nn, _ = p.parseEpsilon()
+		nn, err = p.parseEpsilon()
 
 	}
-	if nn == nil {
+	if err != nil {
 		return
 	}
 	n = &Node{
@@ -331,10 +358,13 @@ func (p *Parser) parseRuleDcl() (n *Node, err error) {
 	}
 	if p.lh.kind == '=' {
 		p.match('=')
-		n.svar, _ = p.parseVarId()
+		n.svar, err = p.parseVarId()
+		if err != nil {
+			return
+		}
 	}
 	if p.lh.kind == '{' {
-		n.right, _ = p.parseAction()
+		n.right, err = p.parseAction()
 	}
 	return
 }
@@ -342,13 +372,14 @@ func (p *Parser) parseRuleDcl() (n *Node, err error) {
 func (p *Parser) parseRHS() (n *Node, err error) {
 	l := new(NodeList)
 	marksyms()
+	defer popsyms()
 	for {
-		nn, _ := p.parseRuleDcl()
-		if nn == nil {
-			break
+		var nn *Node
+		if nn, err = p.parseRuleDcl(); err != nil {
+			return
 		}
 		l = l.add(nn)
-		if p.lh.kind == '|' {
+		if p.lh.kind == '|' || p.lh.kind == ';' {
 			break
 		}
 	}
@@ -356,14 +387,16 @@ func (p *Parser) parseRHS() (n *Node, err error) {
 		op:    ORHS,
 		llist: l,
 	}
-	popsyms()
 	return
 }
 
 func (p *Parser) parseRHSList() (l *NodeList, err error) {
 	l = new(NodeList)
 	for {
-		n, _ := p.parseRHS()
+		var n *Node
+		if n, err = p.parseRHS(); err != nil {
+			return
+		}
 		l = l.add(n)
 		if p.lh.kind == '|' {
 			p.match('|')
@@ -371,7 +404,6 @@ func (p *Parser) parseRHSList() (l *NodeList, err error) {
 		}
 		break
 	}
-	p.match(';')
 	return
 }
 
@@ -403,8 +435,8 @@ func (p *Parser) parseType() (n *Node, err error) {
 }
 
 func (p *Parser) parseLHS() (n *Node, err error) {
-	s, _ := p.parseTermName()
-	if s == nil {
+	s, err := p.parseTermName()
+	if err != nil {
 		return
 	}
 	n = newname(s)
@@ -412,7 +444,7 @@ func (p *Parser) parseLHS() (n *Node, err error) {
 }
 
 func (p *Parser) parseRule() (n *Node, err error) {
-	if n, _ = p.parseLHS(); n == nil {
+	if n, err = p.parseLHS(); err != nil {
 		return
 	}
 	n.op = ORULE
@@ -420,12 +452,17 @@ func (p *Parser) parseRule() (n *Node, err error) {
 
 	if p.lh.kind == '=' {
 		p.match('=')
-		n.ntype, _ = p.parseType()
+		n.ntype, err = p.parseType()
+		if err != nil {
+			return
+		}
 	}
-	p.match(':')
+	if _, err = p.match(':'); err != nil {
+		return
+	}
 
-	rl, _ := p.parseRHSList()
-	if rl == nil {
+	rl, err := p.parseRHSList()
+	if err != nil {
 		return
 	}
 
@@ -440,18 +477,28 @@ func (p *Parser) parseDecl() (n *Node, err error) {
 	case NONTERMINAL:
 		n, err = p.parseRegdef()
 	default:
-		zbError(p.lh.pos, "expected terminal or nonterminal declaration, found %s", p.lh)
+		err = cc.error(p.lh.pos, "expected terminal or nonterminal declaration, found %s", p.lh)
 	}
+
+	// error recovery, simply skip to the next semicolon (the end of a declaration)
+	if err != nil {
+		for p.lh.kind != ';' {
+			p.next()
+		}
+	}
+
+	p.match(';')
+
 	return
 }
 
 func (p *Parser) parseGrammar() (n *Node, err error) {
-	if p.match(GRAMMAR) == nil {
+	if _, err = p.match(GRAMMAR); err != nil {
 		return
 	}
 
-	s, _ := p.parseTermName()
-	if s == nil {
+	var s *Sym
+	if s, err = p.parseTermName(); err != nil {
 		return
 	}
 
@@ -465,10 +512,9 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 
 	l := new(NodeList)
 	for p.lh.kind != EOF {
-		n2, _ := p.parseDecl()
-		if n2 == nil {
-			zbError(p.lh.pos, "Error encountered, quiting parse.")
-			break
+		var n2 *Node
+		if n2, err = p.parseDecl(); err != nil {
+			continue
 		}
 		l = l.add(n2)
 	}
