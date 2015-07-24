@@ -91,7 +91,7 @@ func (t *Token) String() string {
 	switch t.kind {
 	case NAME:
 		return fmt.Sprintf("%s", t.sym)
-	case CHARLIT, REGLIT:
+	case REGLIT:
 		return fmt.Sprintf("%c", t.byt)
 	case STRLIT:
 		return fmt.Sprintf("%s", t.lit)
@@ -269,16 +269,15 @@ lex_whitespace:
 	switch l.ch {
 	case '[':
 		l.mode = Regex
-		break
+		goto lex_charlit
 	case ']':
 		l.mode = Normal
-		break
-	default:
-		goto lex_begin
+		goto lex_charlit
+	case '^':
+		goto lex_charlit
+	case '-':
+		goto lex_charlit
 	}
-	t.kind = CHARLIT
-	t.byt = l.ch
-	goto lex_out
 
 lex_begin:
 	if l.ch == 0 {
@@ -331,6 +330,7 @@ lex_begin:
 	}
 
 	// This is meant to be the default
+lex_charlit:
 	t.kind = TokenKind(l.ch)
 	t.byt = l.ch
 	goto lex_out

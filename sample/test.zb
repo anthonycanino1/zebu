@@ -1,16 +1,11 @@
 grammar regular_definition;
 
-/*
-One : Two | 'two' * ;
-
-EscapeCharacter : '\\' . ;
-ZebuCharacter   : EscapeCharacter | [^\\] ;
-
-LongString      : 'this "whole \'string can match\n'
-
 RegDefStart     : [A-Z] ;
 RegDefPart      : [a-zA-Z0-9] ;
 RegDefId        : RegDefStart RegDefPart*
+
+//EscapeCharacter : '\\' . ;
+//ZebuCharacter   : EscapeCharacter | [^\\] ;
 
 TokDot          : '.'  ;
 TokComma        : ','  ;
@@ -28,7 +23,6 @@ TokLBrack       : '['  ;
 TokRBrack       : ']'  ;
 TokRange        : '-'  ;
 TokAt           : '@'  ;
-*/
 
 program
   : regular_definitions
@@ -60,9 +54,7 @@ add
   : expr '+' expr
   ;
 
-/*
 oadd
 	: 
 	| add
 	;
-	*/

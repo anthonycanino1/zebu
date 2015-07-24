@@ -52,7 +52,6 @@ func (p *Parser) parseNontermName() (s *Sym, err error) {
 	return
 }
 
-// LAST : Working on the parsing
 func (p *Parser) parseChar() (n *Node, err error) {
 	switch p.lh.kind {
 	case NONTERMINAL:
@@ -94,9 +93,66 @@ func (p *Parser) parseGroup() (n *Node, err error) {
 	return
 }
 
+func (p *Parser) parseClassBodyChar() (n *Node, err error) {
+	var t *Token
+	if t, err = p.match(REGLIT); err != nil {
+		return
+	}
+	n = &Node {
+		op: OCHAR,
+		byt: t.byt,
+	}
+	return
+}
+
+func (p *Parser) parseClassBodyRange() (n *Node, err error) {
+	var n1 *Node
+	if n1, err = p.parseClassBodyChar(); err != nil {
+		return
+	}
+	if p.lh.kind != '-' {
+		n = n1
+		return
+	}
+	p.match('-')
+	var n2 *Node
+	if n2, err = p.parseClassBodyChar(); err != nil {
+		return
+	}
+	n = &Node{
+		op:    ORANGE,
+		left:  n1,
+		right: n2,
+	}
+	return
+}
+
 func (p *Parser) parseClassBody() (n *Node, err error) {
-	p.match('[')
-	p.match(']')
+	if _, err = p.match('['); err != nil {
+		return
+	}
+	neg := false
+	if p.lh.kind == '^' {
+		neg = true
+		p.match('^')
+	}
+	l := new(NodeList)
+	for {
+		if p.lh.kind == ']' {
+			break
+		}
+		var n1 *Node
+		if n1, err = p.parseClassBodyRange(); err != nil {
+			return
+		}
+		l = l.add(n1)
+	}
+	_, err = p.match(']')
+	n = &Node{
+		op:    OCLASS,
+		llist: l,
+		neg:   neg,
+	}
 	return
 }
 
@@ -292,7 +348,7 @@ func (p *Parser) parseVarId() (s *Sym, err error) {
 		return
 	}
 	s = t.sym
-	err = pushsym(s) 
+	err = pushsym(s)
 	return
 }
 

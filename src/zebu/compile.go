@@ -134,6 +134,7 @@ type Compiler struct {
 	unresolved   map[*Sym]*Node
 	symscope     *SymList
 	errors       []*CCError
+	opt					 [512]bool
 }
 
 type CCError struct {
@@ -176,6 +177,10 @@ func init() {
 		s := cc.symbols.lookup(syms[i].name)
 		s.lexical = syms[i].kind
 	}
+}
+
+func Options(opt [512]bool) {
+	cc.opt = opt
 }
 
 func Compile(f string) {

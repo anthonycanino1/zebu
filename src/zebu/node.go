@@ -59,9 +59,9 @@ type Node struct {
 	// Common
 	op   NodeOp
 	dump bool
-
 	sym *Sym
 	lit string
+	byt byte
 
 	// ORDCL
 	svar *Sym
@@ -72,6 +72,9 @@ type Node struct {
 	// OREPEAT
 	lb int
 	ub int
+
+	// OCLASS
+	neg bool
 }
 
 func NewNode(op NodeOp, l *Node, r *Node) (n *Node) {
@@ -191,6 +194,8 @@ func walkdump(n *Node, w *Writer) {
 			w.writeln("(TERMINAL: %s)", n.sym)
 		case OREGDEF:
 			w.writeln("(NONTERMINAL: %s)", n.sym)
+		case ONONAME:
+			w.writeln("(ONONAME: %s)", n.sym)
 		}
 		return
 	}
@@ -240,6 +245,22 @@ func walkdump(n *Node, w *Writer) {
 		w.writeln("(UP BOUND: %d)", n.ub)
 		w.writeln(")")
 		w.exit()
+	case OCLASS:
+		w.writeln("(OCLASS")
+		w.enter()
+		for l := n.llist; l != nil; l = l.next {
+			walkdump(l.n, w)
+		}
+		w.writeln(")")
+		w.exit()
+	case ORANGE:
+		w.writeln("(ORANGE")
+		w.enter()
+		walkdump(n.left, w)
+		walkdump(n.right, w)
+		w.exit()
+	case OCHAR:
+		w.writeln("(OCHAR %c)", n.byt)
 	case ORULE:
 		w.write("(RULE: %s", n.sym)
 		if n.ntype != nil {
@@ -260,19 +281,23 @@ func walkdump(n *Node, w *Writer) {
 		w.enter()
 
 		for l := n.llist; l != nil; l = l.next {
+			// Dip directly into ORDCL
 			n1 := l.n
-			walkdump(n1, w)
+			walkdump(n1.left, w)
+			w.enter()
 			if n1.svar != nil {
-				w.write("=%s", n1.svar)
+				w.writeln("(VARID: %s)", n1.svar)
 			}
 			if n1.right != nil {
-				w.write(" {ACTION}")
+				w.writeln("(ACTION)")
 			}
-			w.newline()
+			w.exit()
 		}
 
 		w.writeln(")")
 		w.exit()
+	case ONONAME:
+		w.writeln("(ONONAME: %s)", n.sym)
 	case OSTRLIT:
 		w.writeln("(STRLIT: %s)", n.lit)
 	case OEPSILON:
