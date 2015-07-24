@@ -1,8 +1,8 @@
 package zebu
 
 import (
-	"fmt"
 	"flag"
+	"fmt"
 )
 
 type Sym struct {
@@ -130,12 +130,17 @@ func (g *Grammar) String() string {
 }
 
 type Compiler struct {
+	parser *Parser
+
 	localGrammar *Grammar
 	symbols      *SymTab
 	unresolved   map[*Sym]*Node
 	symscope     *SymList
+	opt          [256]bool
+
 	errors       []*CCError
-	opt					 [256]bool
+	numSavedErrs   	int
+	numTotalErrs		int
 }
 
 type CCError struct {
@@ -153,6 +158,8 @@ func (c *Compiler) error(p *Position, msg string, args ...interface{}) (ce *CCEr
 		msg: fmt.Sprintf(msg, args...),
 	}
 	c.errors = append(c.errors, ce)
+	c.numSavedErrs++
+	c.numTotalErrs++
 	return
 }
 
@@ -171,11 +178,11 @@ func init() {
 		symbols:      newSymTab(),
 		unresolved:   make(map[*Sym]*Node),
 		errors:       make([]*CCError, 0, 10),
+		parser:       NewParser(),
 	}
 
 	flag.BoolVar(&cc.opt['h'], "help", false, "print this help message")
 	flag.BoolVar(&cc.opt['d'], "dump", false, "dump the AST after parsing")
-	
 
 	// Populate symbol table with known symbols
 	for i := 0; i < len(syms); i++ {
@@ -254,20 +261,35 @@ func popsyms() {
 	cc.symscope = nil
 }
 
-func Compile(f string) {
-	p := NewParser()
-	tr := p.parse(f)
-	cc.flushErrors()
-	tr.dumpTree()
-}
-
 func Main() {
 	flag.Parse()
+	args := flag.Args()
 
-	if cc.opt['h'] || len(flag.Args()) == 0 {
+	if cc.opt['h'] || len(args) == 0 {
 		flag.Usage()
 		return
 	}
+
+	// Pass #1: Parse grammar (dependencies must be in include path)
+	name := args[0]
+	ast := cc.parser.parse(name)
+	if cc.numTotalErrs > 0 {
+		cc.flushErrors()
+		return
+	}
+
+	if cc.opt['d'] {
+		ast.dumpTree()
+	}
+
+	// Pass #2: Perform semantic analysis over the grammar. Transforms
+	// the grammar to a valid LL(1) grammar if possible.
+
+	// Pass #3: Generate a DFA for the lexer
+
+	// Pass #4: Codegen
+
+	fmt.Printf("Successful parse!\n")
 
 	return
 }

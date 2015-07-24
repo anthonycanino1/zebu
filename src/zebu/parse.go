@@ -580,17 +580,27 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 }
 
 func (p *Parser) parse(f string) (l *Node) {
-	// Let the parse create a lexer for this file
+	// 1. Create a lexer to scan the file.
 	var err error
 	p.lexer, err = NewLexer(f)
 	if err != nil {
 		panic("could not open file")
 	}
-
-	// Start the lexing for a lookahead
+	cc.numSavedErrs = 0
 	p.lh = p.lexer.Next()
 
-	l, _ = p.parseGrammar()
+	// 2. Parse the file, exiting if any errors were encountered
+	if l, err = p.parseGrammar(); err != nil {
+		return
+	}
+
+	// 3. Check to make sure all unresolved symbols have been resolved.
+	if len(cc.unresolved) > 0 {
+		for k, _ := range cc.unresolved {
+			cc.error(k.pos, "undefined symbol %s\n", k)
+		}
+		return
+	}
 
 	return
 }

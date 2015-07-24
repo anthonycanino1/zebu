@@ -2,10 +2,7 @@ grammar regular_definition;
 
 RegDefStart     : [A-Z] ;
 RegDefPart      : [a-zA-Z0-9] ;
-RegDefId        : RegDefStart RegDefPart*
-
-//EscapeCharacter : '\\' . ;
-//ZebuCharacter   : EscapeCharacter | [^\\] ;
+RegDefId        : RegDefStart RegDefPart* ;
 
 TokDot          : '.'  ;
 TokComma        : ','  ;
@@ -54,7 +51,6 @@ add
   : expr '+' expr
   ;
 
-oadd
-	: 
-	| add
+expr
+	:
 	;
