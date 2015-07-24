@@ -137,6 +137,61 @@ type Compiler struct {
 	opt					 [512]bool
 }
 
+type Flag struct {
+	short byte
+	long string
+	help string
+}
+
+type FlagMap struct {
+	flags []*Flag
+	shortMap map[byte]*Flag
+	longMap map[string]*Flag
+}
+
+func (fm *FlagMap) addFlag(s byte, l string, h string) {
+	f := &Flag{
+		short: s,
+		long: l,
+		help: h,
+	}
+	_, ok1 := fm.shortMap[s]
+	_, ok2 := fm.longMap[l]
+	if ok1 || ok2 {
+		panic("conflict in flag map")
+	}
+	fm.flags = append(fm.flags, f)
+	fm.shortMap[s] = f
+	fm.longMap[l] = f
+	return
+}
+
+func (fm *FlagMap) hasShort(s byte) bool {
+	_, ok := fm.shortMap[s]
+	return ok
+}
+
+func (fm *FlagMap) hasLong(l string) bool {
+	_, ok := fm.longMap[l]
+	return ok
+}
+
+func (fm *FlagMap) shortFromLong(l string) (byte, bool) {
+	if f, ok := fm.longMap[l]; ok {
+		return f.short, true
+	}
+	return 0, false
+}
+
+func (fm *FlagMap) printHelp() {
+	fmt.Printf("zebu usage: -opt [files]\n")
+	for _, f := range fm.flags {
+		fmt.Printf("-%c --%s %s\n", f.short, f.long, f.help)
+	}
+}
+
+var flagMap *FlagMap = nil
+
 type CCError struct {
 	pos *Position
 	msg string
@@ -164,6 +219,15 @@ func (c *Compiler) flushErrors() {
 var cc *Compiler = nil
 
 func init() {
+	flagMap = &FlagMap {
+		flags: make([]*Flag, 0, 10),
+		shortMap: make(map[byte]*Flag),
+		longMap: make(map[string]*Flag),
+	}
+
+	flagMap.addFlag('d', "dump", "dump the ast after parsing pass")
+	flagMap.addFlag('h', "help", "print this help message")
+
 	localGrammar := NewGrammar("_")
 	cc = &Compiler{
 		localGrammar: localGrammar,
@@ -177,17 +241,6 @@ func init() {
 		s := cc.symbols.lookup(syms[i].name)
 		s.lexical = syms[i].kind
 	}
-}
-
-func Options(opt [512]bool) {
-	cc.opt = opt
-}
-
-func Compile(f string) {
-	p := NewParser()
-	tr := p.parse(f)
-	cc.flushErrors()
-	tr.dumpTree()
 }
 
 // Stuff related to dcls, here for now
@@ -258,4 +311,66 @@ func popsyms() {
 		l.s.defv = false
 	}
 	cc.symscope = nil
+}
+
+func parseArgs(osArgs []string) (args []string, ok bool) {
+	if len(osArgs) == 0 {
+		return
+	}
+
+	ok = true
+	for _, e := range osArgs {
+		if e[0] == '-' {
+			if len(e) == 1 || (len(e) == 2 && e[1] == '-') {
+				fmt.Printf("invalid option %s\n", e)
+				ok = false
+				continue
+			}
+			var s byte
+			if e[1] == '-' {
+				l := e[2:]
+				var ok1 bool
+				if s, ok1 = flagMap.shortFromLong(l); !ok1 {
+					fmt.Printf("invalid long option %s\n", l)
+					ok = false
+					continue
+				}
+			} else {
+				if len(e) != 2 {
+					fmt.Printf("short option must be single char only\n")
+					ok = false
+					continue
+				}
+				s = e[1]
+				if !flagMap.hasShort(s) {
+					fmt.Printf("invalid short option %c\n", s)
+					ok = false
+					continue
+				}
+			}
+
+			cc.opt[s] = true
+		} else {
+			args = append(args, e)
+		}
+	}
+	return
+}
+
+func Compile(f string) {
+	p := NewParser()
+	tr := p.parse(f)
+	cc.flushErrors()
+	tr.dumpTree()
+}
+
+func CommandLine(osArgs []string) {
+	args, ok := parseArgs(osArgs)
+
+	if cc.opt['h'] || !ok {
+		flagMap.printHelp()
+		return
+	}
+
+	return
 }
