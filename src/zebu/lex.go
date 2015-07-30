@@ -45,6 +45,7 @@ var tokenLabels = map[TokenKind]string{
 	CHARLIT:     "charlit",
 	STRLIT:      "strlit",
 	REGLIT:      "reglit",
+	NUMLIT:      "numlit",
 
 	// Keyword tokens
 	GRAMMAR:  "grammar",
@@ -97,6 +98,8 @@ func (t *Token) String() string {
 		return fmt.Sprintf("%s", t.lit)
 	case VARID:
 		return fmt.Sprintf("%s", t.sym)
+	case NUMLIT:
+		return fmt.Sprintf("%d", t.nval)
 	default:
 		return t.kind.String()
 	}
@@ -263,6 +266,8 @@ lex_whitespace:
 		line: l.line,
 		col:  l.col,
 	}
+	// Update compiler position for better diagnostics
+	cc.pos = t.pos
 
 	// Let's keep mode handling as the prefix to all lexing (minus whitespace)
 	// Easier to jump state once mode is handled
@@ -311,7 +316,7 @@ lex_begin:
 		l.getc()
 		if l.ch != '*' {
 			l.putc(l.ch)
-			l.ch = '*'
+			l.ch = '/'
 			break
 		}
 		for {
@@ -402,6 +407,7 @@ lex_strlit:
 	}
 	t.kind = STRLIT
 	t.lit = string(lxbuf[:cp])
+
 	goto lex_out
 
 lex_out:

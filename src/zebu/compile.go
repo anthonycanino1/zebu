@@ -3,6 +3,7 @@ package zebu
 import (
 	"flag"
 	"fmt"
+	"sort"
 )
 
 type Sym struct {
@@ -139,8 +140,10 @@ type Compiler struct {
 	opt          [256]bool
 
 	errors       []*CCError
-	numSavedErrs   	int
-	numTotalErrs		int
+	numSavedErrs int
+	numTotalErrs int
+
+	pos *Position
 }
 
 type CCError struct {
@@ -150,6 +153,25 @@ type CCError struct {
 
 func (ce *CCError) Error() string {
 	return ce.msg
+}
+
+type CCErrorByPos []*CCError
+
+func (a CCErrorByPos) Len() int {
+	return len(a)
+}
+
+func (a CCErrorByPos) Swap(i, j int) {
+	a[i], a[j] = a[j], a[i]
+}
+
+func (a CCErrorByPos) Less(i, j int) bool {
+	// TODO : Need a stronger possitioning (sort by order encountered, then by pos inside a file)
+	ie, je := a[i].pos, a[j].pos
+	if ie.line == je.line {
+		return ie.col < je.col
+	}
+	return ie.line < je.line
 }
 
 func (c *Compiler) error(p *Position, msg string, args ...interface{}) (ce *CCError) {
@@ -164,8 +186,9 @@ func (c *Compiler) error(p *Position, msg string, args ...interface{}) (ce *CCEr
 }
 
 func (c *Compiler) flushErrors() {
+	sort.Sort(CCErrorByPos(c.errors))
 	for i := 0; i < len(c.errors); i++ {
-		fmt.Printf("%s:%s\n", c.errors[i].pos, c.errors[i].msg)
+		fmt.Printf("%s: %s\n", c.errors[i].pos, c.errors[i].msg)
 	}
 }
 
@@ -217,8 +240,7 @@ func oldname(s *Sym) (n *Node) {
 func declare(n *Node) {
 	s := n.sym
 	if s.defn != nil && s.defn.op != ONONAME {
-		// Previously declared, flag error
-		fmt.Printf("Previously declared error")
+		cc.error(cc.pos, "%s previously defined at %s.", s, s.pos)
 		return
 	}
 	if s.defn != nil && s.defn.op == ONONAME {
@@ -231,6 +253,7 @@ func declare(n *Node) {
 		return
 	}
 	s.defn = n
+	s.pos = cc.pos
 	return
 }
 

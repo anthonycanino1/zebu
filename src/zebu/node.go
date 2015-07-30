@@ -10,8 +10,8 @@ const (
 
 	OGRAM
 	ORULE
-	ORHS
-	ORDCL
+	OPROD
+	OPRODELEM
 	OSTRLIT
 	OTYPE
 	OACTION
@@ -31,17 +31,17 @@ const (
 type NodeOp int
 
 var nodeOpLabels = map[NodeOp]string{
-	OXXX:     "oxxx",
-	ONONAME:  "ononame",
-	OGRAM:    "ogram",
-	ORULE:    "orule",
-	ORHS:     "orhs",
-	OREGDEF:  "oregdef",
-	OSTRLIT:  "ostrlit",
-	ORDCL:    "ordcl",
-	OTYPE:    "otype",
-	OACTION:  "oaction",
-	OEPSILON: "oepsilon",
+	OXXX:      "oxxx",
+	ONONAME:   "ononame",
+	OGRAM:     "ogram",
+	ORULE:     "orule",
+	OPROD:     "oprod",
+	OREGDEF:   "oregdef",
+	OSTRLIT:   "ostrlit",
+	OPRODELEM: "oprodelem",
+	OTYPE:     "otype",
+	OACTION:   "oaction",
+	OEPSILON:  "oepsilon",
 }
 
 func (n NodeOp) String() string {
@@ -59,14 +59,14 @@ type Node struct {
 	// Common
 	op   NodeOp
 	dump bool
-	sym *Sym
-	lit string
-	byt byte
+	sym  *Sym
+	lit  string
+	byt  byte
 
-	// ORDCL
+	// OPRODELEM
 	svar *Sym
 
-	// OACTION
+	// OACTION/OTYPE
 	code []byte
 
 	// OREPEAT
@@ -75,14 +75,6 @@ type Node struct {
 
 	// OCLASS
 	neg bool
-}
-
-func NewNode(op NodeOp, l *Node, r *Node) (n *Node) {
-	n = new(Node)
-	n.op = op
-	n.left = l
-	n.right = r
-	return n
 }
 
 func (n *Node) String() string {
@@ -260,7 +252,7 @@ func walkdump(n *Node, w *Writer) {
 		walkdump(n.right, w)
 		w.exit()
 	case OCHAR:
-		w.writeln("(OCHAR %c)", n.byt)
+		w.writeln("(OCHAR '%c')", n.byt)
 	case ORULE:
 		w.write("(RULE: %s", n.sym)
 		if n.ntype != nil {
@@ -276,8 +268,8 @@ func walkdump(n *Node, w *Writer) {
 
 		w.writeln(")")
 		w.exit()
-	case ORHS:
-		w.writeln("(RHS ")
+	case OPROD:
+		w.writeln("(OPROD ")
 		w.enter()
 
 		for l := n.llist; l != nil; l = l.next {
@@ -299,7 +291,7 @@ func walkdump(n *Node, w *Writer) {
 	case ONONAME:
 		w.writeln("(ONONAME: %s)", n.sym)
 	case OSTRLIT:
-		w.writeln("(STRLIT: %s)", n.lit)
+		w.writeln("(STRLIT: '%s')", n.lit)
 	case OEPSILON:
 		w.writeln("(EPSILON)")
 	default:

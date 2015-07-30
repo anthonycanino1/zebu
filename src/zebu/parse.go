@@ -98,8 +98,8 @@ func (p *Parser) parseClassBodyChar() (n *Node, err error) {
 	if t, err = p.match(REGLIT); err != nil {
 		return
 	}
-	n = &Node {
-		op: OCHAR,
+	n = &Node{
+		op:  OCHAR,
 		byt: t.byt,
 	}
 	return
@@ -235,30 +235,8 @@ func (p *Parser) parseKleene() (n *Node, err error) {
 	return
 }
 
-func (p *Parser) parseAlt() (n *Node, err error) {
-	if n, err = p.parseKleene(); err != nil {
-		return
-	}
-	for {
-		if p.lh.kind != '|' {
-			break
-		}
-		p.match('|')
-		var n2 *Node
-		if n2, err = p.parseKleene(); err != nil {
-			return
-		}
-		n = &Node{
-			op:    OALT,
-			left:  n,
-			right: n2,
-		}
-	}
-	return
-}
-
 func (p *Parser) parseCat() (n *Node, err error) {
-	n, err = p.parseAlt()
+	n, err = p.parseKleene()
 	if err != nil {
 		return
 	}
@@ -267,7 +245,7 @@ loop:
 		switch p.lh.kind {
 		case '(', '[', NONTERMINAL, STRLIT:
 			var n2 *Node
-			if n2, err = p.parseAlt(); err != nil {
+			if n2, err = p.parseKleene(); err != nil {
 				return
 			}
 			n = &Node{
@@ -282,8 +260,30 @@ loop:
 	return
 }
 
+func (p *Parser) parseAlt() (n *Node, err error) {
+	if n, err = p.parseCat(); err != nil {
+		return
+	}
+	for {
+		if p.lh.kind != '|' {
+			break
+		}
+		p.match('|')
+		var n2 *Node
+		if n2, err = p.parseCat(); err != nil {
+			return
+		}
+		n = &Node{
+			op:    OALT,
+			left:  n,
+			right: n2,
+		}
+	}
+	return
+}
+
 func (p *Parser) parseRegdefDcl() (n *Node, err error) {
-	n2, err := p.parseCat()
+	n2, err := p.parseAlt()
 	if err != nil {
 		return
 	}
@@ -389,27 +389,25 @@ func (p *Parser) parseTerm() (n *Node, err error) {
 	return
 }
 
-func (p *Parser) parseRuleDcl() (n *Node, err error) {
+func (p *Parser) parseProdElem() (n *Node, err error) {
 	var nn *Node
 	switch p.lh.kind {
 	case TERMINAL:
 		nn, err = p.parseTerm()
-
 	case NONTERMINAL:
 		nn, err = p.parseNonterm()
-
 	case STRLIT:
 		nn, err = p.parseStrlit()
-
 	case '|', '{':
 		nn, err = p.parseEpsilon()
-
+	default:
+		err = cc.error(p.lh.pos, "unexpected %s.", p.lh)
 	}
 	if err != nil {
 		return
 	}
 	n = &Node{
-		op:   ORDCL,
+		op:   OPRODELEM,
 		left: nn,
 	}
 	if p.lh.kind == '=' {
@@ -425,13 +423,13 @@ func (p *Parser) parseRuleDcl() (n *Node, err error) {
 	return
 }
 
-func (p *Parser) parseRHS() (n *Node, err error) {
+func (p *Parser) parseProd() (n *Node, err error) {
 	l := new(NodeList)
 	marksyms()
 	defer popsyms()
 	for {
 		var nn *Node
-		if nn, err = p.parseRuleDcl(); err != nil {
+		if nn, err = p.parseProdElem(); err != nil {
 			return
 		}
 		l = l.add(nn)
@@ -440,17 +438,17 @@ func (p *Parser) parseRHS() (n *Node, err error) {
 		}
 	}
 	n = &Node{
-		op:    ORHS,
+		op:    OPROD,
 		llist: l,
 	}
 	return
 }
 
-func (p *Parser) parseRHSList() (l *NodeList, err error) {
+func (p *Parser) parseRuleBody() (l *NodeList, err error) {
 	l = new(NodeList)
 	for {
 		var n *Node
-		if n, err = p.parseRHS(); err != nil {
+		if n, err = p.parseProd(); err != nil {
 			return
 		}
 		l = l.add(n)
@@ -490,7 +488,7 @@ func (p *Parser) parseType() (n *Node, err error) {
 	return
 }
 
-func (p *Parser) parseLHS() (n *Node, err error) {
+func (p *Parser) parseRuleHead() (n *Node, err error) {
 	s, err := p.parseTermName()
 	if err != nil {
 		return
@@ -500,7 +498,7 @@ func (p *Parser) parseLHS() (n *Node, err error) {
 }
 
 func (p *Parser) parseRule() (n *Node, err error) {
-	if n, err = p.parseLHS(); err != nil {
+	if n, err = p.parseRuleHead(); err != nil {
 		return
 	}
 	n.op = ORULE
@@ -517,7 +515,7 @@ func (p *Parser) parseRule() (n *Node, err error) {
 		return
 	}
 
-	rl, err := p.parseRHSList()
+	rl, err := p.parseRuleBody()
 	if err != nil {
 		return
 	}
@@ -596,10 +594,13 @@ func (p *Parser) parse(f string) (l *Node) {
 
 	// 3. Check to make sure all unresolved symbols have been resolved.
 	if len(cc.unresolved) > 0 {
-		for k, _ := range cc.unresolved {
-			cc.error(k.pos, "undefined symbol %s\n", k)
+		for s, _ := range cc.unresolved {
+			if s.lexical == TERMINAL {
+				cc.error(s.pos, "undefined terminal symbol %s.", s)
+			} else {
+				cc.error(s.pos, "undefined nonterminal symbol %s.", s)
+			}
 		}
-		return
 	}
 
 	return
