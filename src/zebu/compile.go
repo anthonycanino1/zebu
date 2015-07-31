@@ -144,6 +144,9 @@ type Compiler struct {
 	numTotalErrs int
 
 	pos *Position
+
+	first  map[*Node]map[*Node]bool
+	follow map[*Node][]*Node
 }
 
 type CCError struct {
@@ -202,10 +205,12 @@ func init() {
 		unresolved:   make(map[*Sym]*Node),
 		errors:       make([]*CCError, 0, 10),
 		parser:       NewParser(),
+		first:				make(map[*Node]map[*Node]bool),
 	}
 
 	flag.BoolVar(&cc.opt['h'], "help", false, "print this help message")
 	flag.BoolVar(&cc.opt['d'], "dump", false, "dump the AST after parsing")
+	flag.BoolVar(&cc.opt['g'], "grammar", false, "print semantic information about grammar construction")
 
 	// Populate symbol table with known symbols
 	for i := 0; i < len(syms); i++ {
@@ -295,18 +300,19 @@ func Main() {
 
 	// Pass #1: Parse grammar (dependencies must be in include path)
 	name := args[0]
-	ast := cc.parser.parse(name)
+	grammar := cc.parser.parse(name)
 	if cc.numTotalErrs > 0 {
 		cc.flushErrors()
 		return
 	}
 
 	if cc.opt['d'] {
-		ast.dumpTree()
+		grammar.dumpTree()
 	}
 
 	// Pass #2: Perform semantic analysis over the grammar. Transforms
 	// the grammar to a valid LL(1) grammar if possible.
+	//semanticPass(grammar)
 
 	// Pass #3: Generate a DFA for the lexer
 

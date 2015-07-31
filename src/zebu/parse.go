@@ -353,9 +353,7 @@ func (p *Parser) parseVarId() (s *Sym, err error) {
 }
 
 func (p *Parser) parseEpsilon() (n *Node, err error) {
-	n = &Node{
-		op: OEPSILON,
-	}
+	n = nepsilon
 	return
 }
 
@@ -515,12 +513,10 @@ func (p *Parser) parseRule() (n *Node, err error) {
 		return
 	}
 
-	rl, err := p.parseRuleBody()
+	n.rlist, err = p.parseRuleBody()
 	if err != nil {
 		return
 	}
-
-	n.rlist = rl
 	return
 }
 
@@ -558,26 +554,30 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 
 	n = &Node{
 		op: OGRAM,
+		rlist: new(NodeList),
 	}
 	n.sym = s
 	//declare(n)
 
 	p.match(';')
 
-	l := new(NodeList)
 	for p.lh.kind != EOF {
 		var n2 *Node
 		if n2, err = p.parseDecl(); err != nil {
 			continue
 		}
-		l = l.add(n2)
+		n.rlist.add(n2)
+
+		// Save start
+		if n2.op == ORULE && n2.sym.name == "start" {
+			n.left = n2
+		}
 	}
 
-	n.rlist = l
 	return
 }
 
-func (p *Parser) parse(f string) (l *Node) {
+func (p *Parser) parse(f string) (n *Node) {
 	// 1. Create a lexer to scan the file.
 	var err error
 	p.lexer, err = NewLexer(f)
@@ -588,7 +588,7 @@ func (p *Parser) parse(f string) (l *Node) {
 	p.lh = p.lexer.Next()
 
 	// 2. Parse the file, exiting if any errors were encountered
-	if l, err = p.parseGrammar(); err != nil {
+	if n, err = p.parseGrammar(); err != nil {
 		return
 	}
 
@@ -601,6 +601,11 @@ func (p *Parser) parse(f string) (l *Node) {
 				cc.error(s.pos, "undefined nonterminal symbol %s.", s)
 			}
 		}
+	}
+
+	// 4. Check to make sure we have a start rule
+	if n.left == nil {
+		cc.error(cc.pos, "grammar must defined a start rule.")
 	}
 
 	return

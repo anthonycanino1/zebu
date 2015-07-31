@@ -57,11 +57,15 @@ type Node struct {
 	ntype *Node
 
 	// Common
-	op   NodeOp
-	dump bool
-	sym  *Sym
-	lit  string
-	byt  byte
+	op  NodeOp
+	sym *Sym
+	lit string
+	byt byte
+
+	// Walking
+	dump   bool
+	first  bool
+	follow bool
 
 	// OPRODELEM
 	svar *Sym
@@ -77,8 +81,17 @@ type Node struct {
 	neg bool
 }
 
+var nepsilon = &Node {
+	op: OEPSILON,
+}
+
 func (n *Node) String() string {
-	return fmt.Sprintf("(Node: %s)\n", n.op)
+	switch n.op {
+	case OGRAM, ORULE, OREGDEF:
+		return fmt.Sprintf("%s : %s", n.op, n.sym)
+	default:
+		return fmt.Sprintf("%s", n.op)
+	}
 }
 
 func (n *Node) list() *NodeList {
@@ -169,6 +182,31 @@ func (w *Writer) writeln(f string, args ...interface{}) {
 func (w *Writer) newline() {
 	fmt.Printf("\n")
 	w.onlin = false
+}
+
+func (n *Node) dumpOneLevel() {
+	if n == nil || n.op != ORULE {
+		panic("dumpOneLevel is for debug purposes only, called on non ORULE node")
+	}
+	for l := n.rlist; l != nil; l = l.next {
+		prod := l.n
+		fmt.Printf("\t-Prod\n")
+		for l2 := prod.llist; l2 != nil; l2 = l2.next {
+			elem := l2.n.left
+			switch elem.op {
+			case ORULE:
+				fmt.Printf("\t\t-Nonterminal: %s\n", elem.sym)
+			case OREGDEF:
+				fmt.Printf("\t\t-Terminal: %s\n", elem.sym)
+			case OSTRLIT:
+				fmt.Printf("\t\t-Terminal: %s\n", elem.lit)
+			case OEPSILON:
+				fmt.Printf("\t\t-Epsilon\n")
+			default:
+				panic(fmt.Sprintf("unexpected op %s in production element\n", elem.op))
+			}
+		}
+	}
 }
 
 func (n *Node) dumpTree() {
@@ -273,7 +311,7 @@ func walkdump(n *Node, w *Writer) {
 		w.enter()
 
 		for l := n.llist; l != nil; l = l.next {
-			// Dip directly into ORDCL
+			// Dip directly into PRODELEM
 			n1 := l.n
 			walkdump(n1.left, w)
 			w.enter()
