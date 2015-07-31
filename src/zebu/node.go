@@ -2,6 +2,7 @@ package zebu
 
 import (
 	"fmt"
+	"bytes"
 )
 
 const (
@@ -63,9 +64,9 @@ type Node struct {
 	byt byte
 
 	// Walking
-	dump   bool
-	first  bool
-	follow bool
+	resolve bool
+	first   bool
+	follow  bool
 
 	// OPRODELEM
 	svar *Sym
@@ -81,7 +82,7 @@ type Node struct {
 	neg bool
 }
 
-var nepsilon = &Node {
+var nepsilon = &Node{
 	op: OEPSILON,
 }
 
@@ -108,7 +109,6 @@ func (n *Node) dcopy(c *Node) *Node {
 	n.llist = c.llist
 	n.rlist = c.rlist
 	n.op = c.op
-	n.dump = c.dump
 	return n
 }
 
@@ -135,6 +135,19 @@ func (l *NodeList) add(n *Node) *NodeList {
 		l.tail = l
 	}
 	return l
+}
+
+func escapeStrlit(s string) string {
+	var b bytes.Buffer
+	for _, c := range s {
+		switch c {
+		case '\n':
+			b.WriteString("\\n")
+		default:
+			b.WriteString(string(c))
+		}
+	}
+	return b.String()
 }
 
 // Just for dumping the tree right now
@@ -199,7 +212,7 @@ func (n *Node) dumpOneLevel() {
 			case OREGDEF:
 				fmt.Printf("\t\t-Terminal: %s\n", elem.sym)
 			case OSTRLIT:
-				fmt.Printf("\t\t-Terminal: %s\n", elem.lit)
+				fmt.Printf("\t\t-Terminal: '%s'\n", escapeStrlit(elem.lit))
 			case OEPSILON:
 				fmt.Printf("\t\t-Epsilon\n")
 			default:
@@ -218,18 +231,6 @@ func walkdump(n *Node, w *Writer) {
 	if n == nil {
 		return
 	}
-	if n.dump {
-		switch n.op {
-		case ORULE:
-			w.writeln("(TERMINAL: %s)", n.sym)
-		case OREGDEF:
-			w.writeln("(NONTERMINAL: %s)", n.sym)
-		case ONONAME:
-			w.writeln("(ONONAME: %s)", n.sym)
-		}
-		return
-	}
-	n.dump = true
 	switch n.op {
 	case OGRAM:
 		w.writeln("(GRAMMAR: %s", n.sym)
@@ -313,7 +314,18 @@ func walkdump(n *Node, w *Writer) {
 		for l := n.llist; l != nil; l = l.next {
 			// Dip directly into PRODELEM
 			n1 := l.n
-			walkdump(n1.left, w)
+			switch n1.left.op {
+			case ORULE:
+				w.writeln("(TERMINAL: %s)", n1.left.sym)
+			case OREGDEF:
+				w.writeln("(NONTERMINAL: %s)", n1.left.sym)
+			case OSTRLIT:
+				w.writeln("(STRLIT: '%s')", escapeStrlit(n1.left.lit))
+			case OEPSILON:
+				w.writeln("(OEPSILON)",)
+			case ONONAME:
+				w.writeln("(ONONAME: %s)", n1.left.sym)
+			}
 			w.enter()
 			if n1.svar != nil {
 				w.writeln("(VARID: %s)", n1.svar)
@@ -326,12 +338,6 @@ func walkdump(n *Node, w *Writer) {
 
 		w.writeln(")")
 		w.exit()
-	case ONONAME:
-		w.writeln("(ONONAME: %s)", n.sym)
-	case OSTRLIT:
-		w.writeln("(STRLIT: '%s')", n.lit)
-	case OEPSILON:
-		w.writeln("(EPSILON)")
 	default:
 		break
 	}

@@ -135,7 +135,6 @@ type Compiler struct {
 
 	localGrammar *Grammar
 	symbols      *SymTab
-	unresolved   map[*Sym]*Node
 	symscope     *SymList
 	opt          [256]bool
 
@@ -202,7 +201,6 @@ func init() {
 	cc = &Compiler{
 		localGrammar: localGrammar,
 		symbols:      newSymTab(),
-		unresolved:   make(map[*Sym]*Node),
 		errors:       make([]*CCError, 0, 10),
 		parser:       NewParser(),
 		first:				make(map[*Node]map[*Node]bool),
@@ -229,13 +227,8 @@ func newname(s *Sym) *Node {
 
 func oldname(s *Sym) (n *Node) {
 	if s.defn == nil {
-		// Since we have no notion of scope, we will use a trick
-		// Declare a dummy node that all future reference will point to
-		// for the symbol.
-		// Resolve at the end.
 		n = newname(s)
 		declare(n)
-		cc.unresolved[s] = n
 		return
 	}
 	n = s.defn
@@ -248,18 +241,25 @@ func declare(n *Node) {
 		cc.error(cc.pos, "%s previously defined at %s.", s, s.pos)
 		return
 	}
-	if s.defn != nil && s.defn.op == ONONAME {
-		// Remove from unresolved
-		if _, ok := cc.unresolved[s]; !ok {
-			panic("ONONAME decl not found in unresolved map!")
-		}
-		delete(cc.unresolved, s)
-		s.defn.dcopy(n)
-		return
-	}
 	s.defn = n
 	s.pos = cc.pos
 	return
+}
+
+func resolve(n *Node) *Node {
+	if n.op != ONONAME {
+		return n
+	}
+	s := n.sym
+	if s.defn == nil || s.defn.op == ONONAME {
+		if s.lexical == TERMINAL {
+			cc.error(s.pos, "unresolved terminal symbol %s\n", s)
+		} else {
+			cc.error(s.pos, "unresolved nonterminal symbol %s\n", s)
+		}
+		return nil
+	}
+	return s.defn
 }
 
 func marksyms() {
@@ -289,6 +289,45 @@ func popsyms() {
 	cc.symscope = nil
 }
 
+// This is for development purpose only, to take my mind off resolution
+// so I can focus on semantic analysis. This resolution has a cost of 
+// O(n) in the size of the AST, which can be done inside one of the
+// other O(n) passes.
+func resolveSymbols(n *Node) *Node {
+	cc.numSavedErrs = 0
+	return walkResolve(n)
+}
+
+func walkResolve(n *Node) *Node {
+	if n == nil || n.resolve {
+		return n
+	}
+	n.resolve = true
+	switch n.op {
+	case ONONAME:
+		return resolve(n)
+	case OGRAM:
+		for l := n.rlist; l != nil; l = l.next {
+			l.n = walkResolve(l.n)
+		}
+	case ORULE:
+		for l := n.rlist; l != nil; l = l.next {
+			prod := l.n
+			for l2 := prod.llist; l2 != nil; l2 = l2.next {
+				// Dip into prodelems
+				elem := l2.n
+				elem.left = walkResolve(elem.left)
+			}
+		}
+	case OREGDEF:
+		n.left = walkResolve(n.left)
+	case OALT, OCAT, OKLEENE, OPLUS, OREPEAT:
+		n.left = walkResolve(n.left)
+		n.right = walkResolve(n.right)
+	}
+	return n
+}
+
 func Main() {
 	flag.Parse()
 	args := flag.Args()
@@ -306,13 +345,23 @@ func Main() {
 		return
 	}
 
+	// Pass #1.5: Resolve symbols (this resolution should be pushed
+	// into Pass #2 in the future to amortize the cost).
+	grammar = resolveSymbols(grammar)
+	if cc.numTotalErrs > 0 {
+		cc.flushErrors()
+		return
+	} 
+
 	if cc.opt['d'] {
 		grammar.dumpTree()
 	}
 
 	// Pass #2: Perform semantic analysis over the grammar. Transforms
-	// the grammar to a valid LL(1) grammar if possible.
-	//semanticPass(grammar)
+	// the grammar to a valid LL(1) grammar if possible. At this point,
+	// we may still have unresolved ONONAME. Amortize the cost of 
+	// resolution inside the pass.
+	//semanticPass(grammar) 
 
 	// Pass #3: Generate a DFA for the lexer
 

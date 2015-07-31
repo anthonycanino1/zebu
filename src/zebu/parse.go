@@ -592,18 +592,7 @@ func (p *Parser) parse(f string) (n *Node) {
 		return
 	}
 
-	// 3. Check to make sure all unresolved symbols have been resolved.
-	if len(cc.unresolved) > 0 {
-		for s, _ := range cc.unresolved {
-			if s.lexical == TERMINAL {
-				cc.error(s.pos, "undefined terminal symbol %s.", s)
-			} else {
-				cc.error(s.pos, "undefined nonterminal symbol %s.", s)
-			}
-		}
-	}
-
-	// 4. Check to make sure we have a start rule
+	// 3. Check to make sure we have a start rule
 	if n.left == nil {
 		cc.error(cc.pos, "grammar must defined a start rule.")
 	}

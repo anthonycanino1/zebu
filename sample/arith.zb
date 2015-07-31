@@ -1,0 +1,26 @@
+grammar arith;
+
+Integer : [1-9][0-9]*	;
+
+start 
+	: addi '\n'
+	;
+
+addi
+	: '+' addi
+	| '-' addi
+	;
+
+multi
+	: expon '*' multi
+	| expon '/' multi
+	;
+
+expon
+	: number
+	;
+
+number
+	: '(' addi ')'
+	| Integer
+	;
