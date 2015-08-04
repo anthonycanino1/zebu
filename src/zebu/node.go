@@ -1,8 +1,8 @@
 package zebu
 
 import (
-	"fmt"
 	"bytes"
+	"fmt"
 )
 
 const (
@@ -65,8 +65,6 @@ type Node struct {
 
 	// Walking
 	resolve bool
-	first   bool
-	follow  bool
 
 	// OPRODELEM
 	svar *Sym
@@ -322,7 +320,7 @@ func walkdump(n *Node, w *Writer) {
 			case OSTRLIT:
 				w.writeln("(STRLIT: '%s')", escapeStrlit(n1.left.lit))
 			case OEPSILON:
-				w.writeln("(OEPSILON)",)
+				w.writeln("(OEPSILON)")
 			case ONONAME:
 				w.writeln("(ONONAME: %s)", n1.left.sym)
 			}

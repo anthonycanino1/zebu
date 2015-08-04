@@ -145,7 +145,7 @@ type Compiler struct {
 	pos *Position
 
 	first  map[*Node]map[*Node]bool
-	follow map[*Node][]*Node
+	follow map[*Node]map[*Node]bool
 }
 
 type CCError struct {
@@ -203,7 +203,8 @@ func init() {
 		symbols:      newSymTab(),
 		errors:       make([]*CCError, 0, 10),
 		parser:       NewParser(),
-		first:				make(map[*Node]map[*Node]bool),
+		first:        make(map[*Node]map[*Node]bool),
+		follow:       make(map[*Node]map[*Node]bool),
 	}
 
 	flag.BoolVar(&cc.opt['h'], "help", false, "print this help message")
@@ -253,9 +254,9 @@ func resolve(n *Node) *Node {
 	s := n.sym
 	if s.defn == nil || s.defn.op == ONONAME {
 		if s.lexical == TERMINAL {
-			cc.error(s.pos, "unresolved terminal symbol %s\n", s)
+			cc.error(s.pos, "unresolved terminal symbol %s.", s)
 		} else {
-			cc.error(s.pos, "unresolved nonterminal symbol %s\n", s)
+			cc.error(s.pos, "unresolved nonterminal symbol %s.", s)
 		}
 		return nil
 	}
@@ -290,7 +291,7 @@ func popsyms() {
 }
 
 // This is for development purpose only, to take my mind off resolution
-// so I can focus on semantic analysis. This resolution has a cost of 
+// so I can focus on semantic analysis. This resolution has a cost of
 // O(n) in the size of the AST, which can be done inside one of the
 // other O(n) passes.
 func resolveSymbols(n *Node) *Node {
@@ -299,7 +300,7 @@ func resolveSymbols(n *Node) *Node {
 }
 
 func walkResolve(n *Node) *Node {
-	if n == nil || n.resolve {
+	if n == nil || (n.op != ONONAME && n.resolve) {
 		return n
 	}
 	n.resolve = true
@@ -351,7 +352,7 @@ func Main() {
 	if cc.numTotalErrs > 0 {
 		cc.flushErrors()
 		return
-	} 
+	}
 
 	if cc.opt['d'] {
 		grammar.dumpTree()
@@ -359,15 +360,13 @@ func Main() {
 
 	// Pass #2: Perform semantic analysis over the grammar. Transforms
 	// the grammar to a valid LL(1) grammar if possible. At this point,
-	// we may still have unresolved ONONAME. Amortize the cost of 
+	// we may still have unresolved ONONAME. Amortize the cost of
 	// resolution inside the pass.
-	//semanticPass(grammar) 
+	semanticPass(grammar)
 
 	// Pass #3: Generate a DFA for the lexer
 
 	// Pass #4: Codegen
-
-	fmt.Printf("Successful parse!\n")
 
 	return
 }

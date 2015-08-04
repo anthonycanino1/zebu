@@ -553,7 +553,7 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 	}
 
 	n = &Node{
-		op: OGRAM,
+		op:    OGRAM,
 		rlist: new(NodeList),
 	}
 	n.sym = s
@@ -594,7 +594,7 @@ func (p *Parser) parse(f string) (n *Node) {
 
 	// 3. Check to make sure we have a start rule
 	if n.left == nil {
-		cc.error(cc.pos, "grammar must defined a start rule.")
+		cc.error(cc.pos, "grammar must define a start rule.")
 	}
 
 	return

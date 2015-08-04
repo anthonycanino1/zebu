@@ -7,13 +7,13 @@ start
 	;
 
 addi
-	: multi '+' addi
-	| multi '-' addi
+	: addi '+' multi
+	| addi '-' multi
 	;
 
 multi
-	: expon '*' multi
-	| expon '/' multi
+	: multi '*' expon
+	| multi '/' expon
 	;
 
 expon

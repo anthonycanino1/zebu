@@ -1,0 +1,37 @@
+grammar arith;
+
+Integer : [1-9][0-9]*	;
+
+start 
+	: addi
+	;
+
+addi
+	: multi addi_prime 
+	;
+
+addi_prime
+	: /* epsilon */
+	| '+' multi addi_prime
+	| '-' multi addi_prime
+	;
+
+multi
+	: expon multi_prime
+	| expon multi_prime
+	;
+
+multi_prime
+	: /* epsilon */
+	| '*' expon multi_prime
+	| '/' expon multi_prime
+	;
+
+expon
+	: number
+	;
+
+number
+	: '(' addi ')'
+	| Integer
+	;
