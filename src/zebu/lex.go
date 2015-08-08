@@ -81,7 +81,7 @@ type Token struct {
 	kind TokenKind
 
 	// Simulating a union
-	lit  string
+	lit  *Strlit
 	nval int
 	byt  byte
 	sym  *Sym
@@ -406,7 +406,7 @@ lex_strlit:
 		cp++
 	}
 	t.kind = STRLIT
-	t.lit = string(lxbuf[:cp])
+	t.lit = cc.strlits.lookup(string(lxbuf[:cp]))
 
 	goto lex_out
 

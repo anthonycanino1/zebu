@@ -362,10 +362,7 @@ func (p *Parser) parseStrlit() (n *Node, err error) {
 	if err != nil {
 		return
 	}
-	n = &Node{
-		op:  OSTRLIT,
-		lit: t.lit,
-	}
+	n = strlitNode(t.lit)
 	return
 }
 

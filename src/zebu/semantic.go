@@ -9,6 +9,53 @@ import (
 // Debug, erase when done
 var _ = fmt.Printf
 
+/*
+func primeName(name string) string {
+	namep := name
+	for cc.symbols.lookup(namep) != nil {
+		namep = fmt.Sprintf("%s'", namep)
+	}
+	return namep
+}
+
+func leftFactor(top *Node) {
+	newRules := new(NodeList)
+	for dcls := top.rlist; dcls != nil; dcls = dcls.next {
+		dcl := dcls.n
+		if dcl.op != ORULE {
+			continue
+		}
+
+		// First pass to categorize our possible left factor paths
+		paths := make(map[*Node]NodeList)
+
+		// Note : We need to intern our strlits
+		// LAST
+	}
+}
+
+func removeDirectLeftRecursion(top *Node) {
+	newRules := new(NodeList)
+	for dcls := top.rlist; dcls != nil; dcls = dcls.next {
+		dcl := dcls.n
+		if dcl.op != ORULE {
+			continue
+		}
+		for prods := dcl.rlist; prods != nil; prods = prods.next {
+			prod := prods.n
+			fst := prod.llist.n
+			if fst.left == dcl {
+				fmt.Printf("Found left recursion on %s\n", dcl.sym)
+			}
+		}
+	}
+}
+
+func removeRecursion(top *Node) {
+	removeDirectLeftRecursion(top)
+}
+*/
+
 func buildFirst(n *Node) {
 	if n.op != OGRAM {
 		panic("buildFirst called on non OGRAM node")
@@ -170,7 +217,7 @@ func printSet(top *Node, name string, set *map[*Node]map[*Node]bool) {
 			case OREGDEF:
 				fmt.Fprintf(w, "%s\t", t.sym)
 			case OSTRLIT:
-				fmt.Fprintf(w, "%s\t", escapeStrlit(t.lit))
+				fmt.Fprintf(w, "%s\t", escapeStrlit(t.lit.lit))
 			case OEPSILON:
 				fmt.Fprintf(w, "epsilon\t")
 			default:

@@ -60,7 +60,7 @@ type Node struct {
 	// Common
 	op  NodeOp
 	sym *Sym
-	lit string
+	lit *Strlit
 	byt byte
 
 	// Walking
@@ -210,7 +210,7 @@ func (n *Node) dumpOneLevel() {
 			case OREGDEF:
 				fmt.Printf("\t\t-Terminal: %s\n", elem.sym)
 			case OSTRLIT:
-				fmt.Printf("\t\t-Terminal: '%s'\n", escapeStrlit(elem.lit))
+				fmt.Printf("\t\t-Terminal: '%s'\n", escapeStrlit(elem.lit.lit))
 			case OEPSILON:
 				fmt.Printf("\t\t-Epsilon\n")
 			default:
@@ -318,7 +318,7 @@ func walkdump(n *Node, w *Writer) {
 			case OREGDEF:
 				w.writeln("(NONTERMINAL: %s)", n1.left.sym)
 			case OSTRLIT:
-				w.writeln("(STRLIT: '%s')", escapeStrlit(n1.left.lit))
+				w.writeln("(STRLIT: '%s')", escapeStrlit(n1.left.lit.lit))
 			case OEPSILON:
 				w.writeln("(OEPSILON)")
 			case ONONAME:

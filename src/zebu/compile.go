@@ -6,10 +6,66 @@ import (
 	"sort"
 )
 
+type Strlit struct {
+	lit  string
+	link *Strlit
+	defn *Node
+	gram *Grammar
+}
+
+func (s *Strlit) String() string {
+	return s.lit
+}
+
+type StrlitTab struct {
+	table map[string]*Strlit
+}
+
+func newStrlitTab() (t *StrlitTab) {
+	t = &StrlitTab{
+		table: make(map[string]*Strlit),
+	}
+
+	return
+}
+
+// TODO : Might want to move this from a global function to operate
+// directly on the Compiler type
+func (t *StrlitTab) lookup(s string) *Strlit {
+	return t.lookupGrammar(s, cc.localGrammar)
+}
+
+func (t *StrlitTab) lookupGrammar(s string, g *Grammar) (lit *Strlit) {
+	for h := t.table[s]; h != nil; h = h.link {
+		if h.lit == s && h.gram == g {
+			return h
+		}
+	}
+
+	h := t.table[s]
+	lit = &Strlit{
+		lit:  s,
+		link: h,
+		gram: g,
+	}
+	t.table[s] = lit
+
+	return
+}
+
+func (t *StrlitTab) dump() {
+	fmt.Printf("----Table----")
+	for _, v := range t.table {
+		for s := v; s != nil; s = s.link {
+			fmt.Printf("%s\n", s)
+		}
+	}
+}
+
 type Sym struct {
 	name string
-	pos  *Position
 	link *Sym
+	pos  *Position
 	gram *Grammar
 	defn *Node
 	defv bool
@@ -135,6 +191,7 @@ type Compiler struct {
 
 	localGrammar *Grammar
 	symbols      *SymTab
+	strlits      *StrlitTab
 	symscope     *SymList
 	opt          [256]bool
 
@@ -201,6 +258,7 @@ func init() {
 	cc = &Compiler{
 		localGrammar: localGrammar,
 		symbols:      newSymTab(),
+		strlits:      newStrlitTab(),
 		errors:       make([]*CCError, 0, 10),
 		parser:       NewParser(),
 		first:        make(map[*Node]map[*Node]bool),
@@ -219,6 +277,18 @@ func init() {
 }
 
 // Stuff related to dcls, here for now
+func strlitNode(s *Strlit) *Node {
+	if s.defn != nil {
+		return s.defn
+	}
+	n := &Node{
+		op:  OSTRLIT,
+		lit: s,
+	}
+	s.defn = n
+	return n
+}
+
 func newname(s *Sym) *Node {
 	return &Node{
 		op:  ONONAME,
@@ -358,11 +428,13 @@ func Main() {
 		grammar.dumpTree()
 	}
 
+	//removeRecursion(grammar)
+
 	// Pass #2: Perform semantic analysis over the grammar. Transforms
 	// the grammar to a valid LL(1) grammar if possible. At this point,
 	// we may still have unresolved ONONAME. Amortize the cost of
 	// resolution inside the pass.
-	semanticPass(grammar)
+	//semanticPass(grammar)
 
 	// Pass #3: Generate a DFA for the lexer
 
