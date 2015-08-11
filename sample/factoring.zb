@@ -1,0 +1,12 @@
+grammar factoring;
+
+start
+	: a
+	;
+
+a 
+	: '1'
+	| '1' '2'
+	| '1' '2' '3'
+	;
+	
