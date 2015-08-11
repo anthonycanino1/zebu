@@ -88,6 +88,10 @@ func (n *Node) String() string {
 	switch n.op {
 	case OGRAM, ORULE, OREGDEF:
 		return fmt.Sprintf("%s : %s", n.op, n.sym)
+	case OSTRLIT:
+		return fmt.Sprintf("%s : %s", n.op, n.lit)
+	case OPRODELEM:
+		return fmt.Sprintf("%s : (%s)", n.op, n.left)
 	default:
 		return fmt.Sprintf("%s", n.op)
 	}
@@ -108,6 +112,38 @@ func (n *Node) dcopy(c *Node) *Node {
 	n.rlist = c.rlist
 	n.op = c.op
 	return n
+}
+
+func nodeAsList(n *Node) *NodeList {
+	return n.list()
+}
+
+func nodeRuleFromFactoring(dcl *Node, remain *[]*NodeList) (rule *Node) {
+	prods := new(NodeList)
+	for i := 0; i < len(*remain); i++ {
+		elmns := (*remain)[i]
+		if elmns == nil {
+			elmn := &Node {
+				op: OPRODELEM,
+				left: nepsilon,
+			}
+			elmns = elmn.list()
+		}
+		prods.add(&Node{
+			op:    OPROD,
+			llist: elmns,
+		})
+	}
+
+	fname := primeName(dcl.sym.name)
+	s := cc.symbols.lookup(fname)
+	rule = &Node{
+		op:    ORULE,
+		sym:   s,
+		rlist: prods,
+	}
+	declare(rule)
+	return
 }
 
 type NodeList struct {
@@ -133,6 +169,15 @@ func (l *NodeList) add(n *Node) *NodeList {
 		l.tail = l
 	}
 	return l
+}
+
+// TODO : We can cache this to optimize later
+func (l *NodeList) len() int {
+	ln := 0
+	for l1 := l; l1 != nil; l1 = l1.next {
+		ln++
+	}
+	return ln
 }
 
 func escapeStrlit(s string) string {

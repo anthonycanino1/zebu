@@ -9,17 +9,17 @@ import (
 // Debug, erase when done
 var _ = fmt.Printf
 
-/*
 func primeName(name string) string {
 	namep := name
-	for cc.symbols.lookup(namep) != nil {
+	s := cc.symbols.lookup(namep)
+	for s.defn != nil {
 		namep = fmt.Sprintf("%s'", namep)
+		s = cc.symbols.lookup(namep)
 	}
 	return namep
 }
 
 func leftFactor(top *Node) {
-	newRules := new(NodeList)
 	for dcls := top.rlist; dcls != nil; dcls = dcls.next {
 		dcl := dcls.n
 		if dcl.op != ORULE {
@@ -27,15 +27,66 @@ func leftFactor(top *Node) {
 		}
 
 		// First pass to categorize our possible left factor paths
-		paths := make(map[*Node]NodeList)
+		paths := make(map[*Node][]*Node)
 
-		// Note : We need to intern our strlits
-		// LAST
+		for prods := dcl.rlist; prods != nil; prods = prods.next {
+			prod := prods.n
+			fst := prod.llist.n.left
+			paths[fst] = append(paths[fst], prod)
+		}
+
+		newProds := new(NodeList)
+
+		for _, set := range paths {
+			if len(set) <= 1 {
+				newProds.add(set[0])
+				continue
+			}
+
+			// Grab the greatest common left factor for each production
+			// Set will save the state of our iteration
+			common := new(NodeList)
+
+			factors := make([]*NodeList, 0, len(set))
+			for i := 0; i < len(set); i++ {
+				factors = append(factors, set[i].llist)
+			}
+
+		nomorecommon:
+			for factors[0] != nil {
+				for i := 1; i < len(factors); i++ {
+					if factors[0].n.left != factors[i].n.left {
+						break nomorecommon
+					}
+					factors[i] = factors[i].next
+				}
+				common.add(factors[0].n)
+				factors[0] = factors[0].next
+			}
+
+			// create a new rule for the common elems, and factor
+			// out from each node
+			fact := nodeRuleFromFactoring(dcl, &factors)
+			top.rlist.add(fact)
+
+			// CODE : Maybe pull this into a cons? I don't like how it
+			// is very specific, it basically becomes a functions for this
+			// use only
+			newProds.add(&Node{
+				op: OPROD,
+				llist: common.concat(nodeAsList(&Node{
+					op:   OPRODELEM,
+					left: fact,
+				})),
+			})
+		}
+
+		dcl.rlist = newProds
 	}
 }
 
 func removeDirectLeftRecursion(top *Node) {
-	newRules := new(NodeList)
+	//newRules := new(NodeList)
 	for dcls := top.rlist; dcls != nil; dcls = dcls.next {
 		dcl := dcls.n
 		if dcl.op != ORULE {
@@ -54,7 +105,6 @@ func removeDirectLeftRecursion(top *Node) {
 func removeRecursion(top *Node) {
 	removeDirectLeftRecursion(top)
 }
-*/
 
 func buildFirst(n *Node) {
 	if n.op != OGRAM {
@@ -242,11 +292,15 @@ func printFollow(top *Node) {
 func semanticPass(top *Node) {
 	cc.numSavedErrs = 0
 
-	buildFirst(top)
-	buildFollow(top)
+	leftFactor(top)
 
-	if cc.opt['g'] {
-		printFirst(top)
-		printFollow(top)
-	}
+	/*
+		buildFirst(top)
+		buildFollow(top)
+
+		if cc.opt['g'] {
+			printFirst(top)
+			printFollow(top)
+		}
+	*/
 }

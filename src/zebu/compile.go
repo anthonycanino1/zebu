@@ -424,11 +424,11 @@ func Main() {
 		return
 	}
 
+	leftFactor(grammar)
+
 	if cc.opt['d'] {
 		grammar.dumpTree()
 	}
-
-	//removeRecursion(grammar)
 
 	// Pass #2: Perform semantic analysis over the grammar. Transforms
 	// the grammar to a valid LL(1) grammar if possible. At this point,

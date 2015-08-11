@@ -3,24 +3,49 @@ grammar arith;
 Integer : [1-9][0-9]*	;
 
 start 
-	: addi '\n'
+	: addi=$1 '\n'
+	{
+		$$ = $1
+	}
 	;
 
 addi
-	: addi '+' multi
+	: addi=$1 '+' multi=$2
+	{
+		$R = $1 + $2
+	}
 	| addi '-' multi
+	{
+		$R = $1 - $2
+	}
 	;
 
 multi
-	: multi '*' expon
-	| multi '/' expon
+	: multi=$1 '*' expon=$2
+	{
+		$R = $1 * $2
+	}
+
+	| multi=$1 '/' expon=$2
+	{
+		$R = $1 / $2
+	}
 	;
 
 expon
-	: number
+	: number=$1
+	{
+		$R = $1
+	}
 	;
 
 number
-	: '(' addi ')'
-	| Integer
+	: '(' addi=$1 ')'
+	{
+		$R = $1
+	}
+	| Integer=$1
+	{
+		$R = toInt($1)
+	}
 	;
