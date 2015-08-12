@@ -101,8 +101,18 @@ func (n *Node) list() *NodeList {
 	nl := new(NodeList)
 	nl.n = n
 	nl.next = nil
-	nl.tail = nl
+	nl.end = nl
 	return nl
+}
+
+func (n *Node) prodElem() *Node {
+	if n.op == OPRODELEM {
+		panic("should never build an oprodelem from an oprodleme")
+	}
+	return &Node{
+		op:   OPRODELEM,
+		left: n,
+	}
 }
 
 func (n *Node) dcopy(c *Node) *Node {
@@ -123,8 +133,8 @@ func nodeRuleFromFactoring(dcl *Node, remain *[]*NodeList) (rule *Node) {
 	for i := 0; i < len(*remain); i++ {
 		elmns := (*remain)[i]
 		if elmns == nil {
-			elmn := &Node {
-				op: OPRODELEM,
+			elmn := &Node{
+				op:   OPRODELEM,
 				left: nepsilon,
 			}
 			elmns = elmn.list()
@@ -135,8 +145,8 @@ func nodeRuleFromFactoring(dcl *Node, remain *[]*NodeList) (rule *Node) {
 		})
 	}
 
-	fname := primeName(dcl.sym.name)
-	s := cc.symbols.lookup(fname)
+	rname := primeName(dcl.sym.name)
+	s := cc.symbols.lookup(rname)
 	rule = &Node{
 		op:    ORULE,
 		sym:   s,
@@ -146,15 +156,47 @@ func nodeRuleFromFactoring(dcl *Node, remain *[]*NodeList) (rule *Node) {
 	return
 }
 
+func nodeRuleFromLeftRecursion(dcl *Node, prod *Node) (rule *Node) {
+	rname := primeName(dcl.sym.name)
+	s := cc.symbols.lookup(rname)
+	rule = &Node{
+		op:  ORULE,
+		sym: s,
+	}
+	declare(rule)
+	remain := prod.llist.tail()
+
+	prods := new(NodeList)
+	prods.add(&Node{
+		op:    OPROD,
+		llist: nepsilon.prodElem().list(),
+	})
+	prods.add(&Node{
+		op:    OPROD,
+		llist: remain.add(rule.prodElem()),
+	})
+	rule.rlist = prods
+	return
+}
+
 type NodeList struct {
 	n    *Node
 	next *NodeList
-	tail *NodeList
+	end *NodeList
+}
+
+func (l *NodeList) tail() *NodeList {
+	if (l.next == nil) {
+		panic("Cannot take the tail of a single element list");
+	}
+	l.next.end = l.end
+	return l.next
 }
 
 func (l *NodeList) concat(r *NodeList) *NodeList {
-	l.tail.next = r
-	l.tail = r.tail
+	l.end.next = r
+	l.end = r.end
+	r.end = nil
 	return l
 }
 
@@ -166,7 +208,7 @@ func (l *NodeList) add(n *Node) *NodeList {
 		return l.concat(n.list())
 	} else {
 		l.n = n
-		l.tail = l
+		l.end = l
 	}
 	return l
 }

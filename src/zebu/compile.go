@@ -424,7 +424,7 @@ func Main() {
 		return
 	}
 
-	leftFactor(grammar)
+	typeCheck(grammar)
 
 	if cc.opt['d'] {
 		grammar.dumpTree()

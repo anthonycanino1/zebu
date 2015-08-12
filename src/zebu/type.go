@@ -85,25 +85,47 @@ func leftFactor(top *Node) {
 	}
 }
 
-func removeDirectLeftRecursion(top *Node) {
+func removeDirectRecursion(top *Node) {
 	//newRules := new(NodeList)
 	for dcls := top.rlist; dcls != nil; dcls = dcls.next {
 		dcl := dcls.n
 		if dcl.op != ORULE {
 			continue
 		}
+
+		nonRec := new(NodeList)
+		var leftRec *Node = nil
+
 		for prods := dcl.rlist; prods != nil; prods = prods.next {
 			prod := prods.n
 			fst := prod.llist.n
-			if fst.left == dcl {
-				fmt.Printf("Found left recursion on %s\n", dcl.sym)
+			switch {
+			case fst.left == dcl:
+				if leftRec != nil {
+					panic(fmt.Sprintf("multiple left recursion found for %s. left factoring should prevent this.", dcl.sym))
+				}
+				leftRec = prod
+			default:
+				nonRec.add(prod)
 			}
 		}
+		if leftRec == nil {
+			continue
+		}
+
+		rule := nodeRuleFromLeftRecursion(dcl, leftRec)
+		top.rlist.add(rule)
+
+		for prods := nonRec; prods != nil; prods = prods.next {
+			prod := prods.n
+			prod.llist.add(rule.prodElem())
+		}
+
+		dcl.rlist = nonRec
 	}
 }
 
-func removeRecursion(top *Node) {
-	removeDirectLeftRecursion(top)
+func removeIndirectRecursion(top *Node) {
 }
 
 func buildFirst(n *Node) {
@@ -289,18 +311,27 @@ func printFollow(top *Node) {
 	printSet(top, "Follow", &cc.follow)
 }
 
-func semanticPass(top *Node) {
-	cc.numSavedErrs = 0
-
-	leftFactor(top)
-
-	/*
-		buildFirst(top)
-		buildFollow(top)
-
-		if cc.opt['g'] {
-			printFirst(top)
-			printFollow(top)
-		}
-	*/
+func ll1Check(top *Node) {
 }
+
+func typeCheck(top *Node) {
+	// 1. Perform transformation of the grammar, aiding the user
+	// in writing a LL(1) language.
+	leftFactor(top)	
+	removeDirectRecursion(top)
+	removeIndirectRecursion(top)
+
+	// 2. Create first and follow sets to analyze the transformed
+	// grammar.
+	buildFirst(top)
+	buildFollow(top)
+
+	if (cc.opt['g']) {
+		printFirst(top)
+		printFollow(top)
+	}
+
+	// 3. Check for LL(1) grammar
+	ll1Check(top)
+}
+
