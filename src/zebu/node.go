@@ -62,9 +62,11 @@ type Node struct {
 	sym *Sym
 	lit *Strlit
 	byt byte
+	pos *Position
 
 	// Walking
-	resolve bool
+	resolve  bool
+	ll1check bool
 
 	// OPRODELEM
 	svar *Sym
@@ -182,12 +184,12 @@ func nodeRuleFromLeftRecursion(dcl *Node, prod *Node) (rule *Node) {
 type NodeList struct {
 	n    *Node
 	next *NodeList
-	end *NodeList
+	end  *NodeList
 }
 
 func (l *NodeList) tail() *NodeList {
-	if (l.next == nil) {
-		panic("Cannot take the tail of a single element list");
+	if l.next == nil {
+		panic("Cannot take the tail of a single element list")
 	}
 	l.next.end = l.end
 	return l.next

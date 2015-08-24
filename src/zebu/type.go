@@ -312,12 +312,67 @@ func printFollow(top *Node) {
 }
 
 func ll1Check(top *Node) {
+	for dcls := top.rlist; dcls != nil; dcls = dcls.next {
+		dcl := dcls.n
+		if dcl.op != ORULE {
+			continue
+		}
+
+		disjoint := make(map[*Node]bool)
+		followNotAdded := true
+		for prods := dcl.rlist; prods != nil; prods = prods.next {
+			prod := prods.n
+			fst := prod.llist.n.left
+			if fst == nil {
+				panic("unexpected nil in production element list")
+			}
+			switch fst.op {
+			case OSTRLIT, OREGDEF:
+				if disjoint[fst] {
+					fmt.Printf("%s is ambiguous\n", dcl.sym)
+				}
+				disjoint[fst] = true
+			case OEPSILON:
+				if followNotAdded {
+					for k, _ := range cc.follow[dcl] {
+						if disjoint[k] {
+							fmt.Printf("%s is ambiguous\n", dcl.sym)
+						}
+						disjoint[k] = true
+					}
+					followNotAdded = false
+				}
+			case ORULE:
+				if cc.first[fst][nepsilon] && followNotAdded {
+					// Use follow[dcl]
+					for k, _ := range cc.follow[dcl] {
+						if disjoint[k] {
+							fmt.Printf("%s is ambiguous\n", dcl.sym)
+						}
+						disjoint[k] = true
+					}
+					followNotAdded = false
+				} else {
+					// Use first[fst]
+					for k, _ := range cc.first[fst] {
+						if disjoint[k] {
+							fmt.Printf("%s is ambiguous\n", dcl.sym)
+						}
+						disjoint[k] = true
+					}
+				}
+			default:
+				panic(fmt.Sprintf("unexpected op %s in production\n", fst.op))
+			}
+		}
+
+	}
 }
 
 func typeCheck(top *Node) {
 	// 1. Perform transformation of the grammar, aiding the user
 	// in writing a LL(1) language.
-	leftFactor(top)	
+	leftFactor(top)
 	removeDirectRecursion(top)
 	removeIndirectRecursion(top)
 
@@ -326,7 +381,7 @@ func typeCheck(top *Node) {
 	buildFirst(top)
 	buildFollow(top)
 
-	if (cc.opt['g']) {
+	if cc.opt['g'] {
 		printFirst(top)
 		printFollow(top)
 	}
@@ -334,4 +389,3 @@ func typeCheck(top *Node) {
 	// 3. Check for LL(1) grammar
 	ll1Check(top)
 }
-
