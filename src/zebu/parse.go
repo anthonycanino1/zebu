@@ -136,7 +136,7 @@ func (p *Parser) parseClassBody() (n *Node, err error) {
 		neg = true
 		p.match('^')
 	}
-	l := new(NodeList)
+	l := make([]*Node, 0)
 	for {
 		if p.lh.kind == ']' {
 			break
@@ -145,12 +145,12 @@ func (p *Parser) parseClassBody() (n *Node, err error) {
 		if n1, err = p.parseClassBodyRange(); err != nil {
 			return
 		}
-		l = l.add(n1)
+		l = append(l, n1)
 	}
 	_, err = p.match(']')
 	n = &Node{
 		op:    OCLASS,
-		llist: l,
+		nodes: l,
 		neg:   neg,
 	}
 	return
@@ -419,7 +419,7 @@ func (p *Parser) parseProdElem() (n *Node, err error) {
 }
 
 func (p *Parser) parseProd() (n *Node, err error) {
-	l := new(NodeList)
+	l := make([]*Node, 0)
 	marksyms()
 	defer popsyms()
 	for {
@@ -427,26 +427,26 @@ func (p *Parser) parseProd() (n *Node, err error) {
 		if nn, err = p.parseProdElem(); err != nil {
 			return
 		}
-		l = l.add(nn)
+		l = append(l, nn)
 		if p.lh.kind == '|' || p.lh.kind == ';' {
 			break
 		}
 	}
 	n = &Node{
 		op:    OPROD,
-		llist: l,
+		nodes: l,
 	}
 	return
 }
 
-func (p *Parser) parseRuleBody() (l *NodeList, err error) {
-	l = new(NodeList)
+func (p *Parser) parseRuleBody() (l []*Node, err error) {
+	l = make([]*Node, 0)
 	for {
 		var n *Node
 		if n, err = p.parseProd(); err != nil {
 			return
 		}
-		l = l.add(n)
+		l = append(l, n)
 		if p.lh.kind == '|' {
 			p.match('|')
 			continue
@@ -510,7 +510,7 @@ func (p *Parser) parseRule() (n *Node, err error) {
 		return
 	}
 
-	n.rlist, err = p.parseRuleBody()
+	n.nodes, err = p.parseRuleBody()
 	if err != nil {
 		return
 	}
@@ -551,7 +551,7 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 
 	n = &Node{
 		op:    OGRAM,
-		rlist: new(NodeList),
+		nodes: make([]*Node, 0),
 	}
 	n.sym = s
 	//declare(n)
@@ -563,7 +563,7 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 		if n2, err = p.parseDecl(); err != nil {
 			continue
 		}
-		n.rlist.add(n2)
+		n.nodes = append(n.nodes, n2)
 
 		// Save start
 		if n2.op == ORULE && n2.sym.name == "start" {

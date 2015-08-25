@@ -55,6 +55,7 @@ type Node struct {
 	right *Node
 	llist *NodeList
 	rlist *NodeList
+	nodes []*Node
 	ntype *Node
 
 	// Common
