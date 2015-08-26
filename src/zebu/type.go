@@ -20,8 +20,7 @@ func primeName(name string) string {
 }
 
 func leftFactor(top *Node) {
-	for dcls := top.rlist; dcls != nil; dcls = dcls.next {
-		dcl := dcls.n
+	for _, dcl := range top.nodes {
 		if dcl.op != ORULE {
 			continue
 		}
@@ -29,76 +28,80 @@ func leftFactor(top *Node) {
 		// First pass to categorize our possible left factor paths
 		paths := make(map[*Node][]*Node)
 
-		for prods := dcl.rlist; prods != nil; prods = prods.next {
-			prod := prods.n
-			fst := prod.llist.n.left
+		for _, prod := range dcl.nodes {
+			fst := prod.nodes[0].left
 			paths[fst] = append(paths[fst], prod)
 		}
 
-		newProds := new(NodeList)
+		newProds := make([]*Node, 0)
 
 		for _, set := range paths {
 			if len(set) <= 1 {
-				newProds.add(set[0])
+				newProds = append(newProds, set[0])
 				continue
 			}
 
 			// Grab the greatest common left factor for each production
 			// Set will save the state of our iteration
-			common := new(NodeList)
+			common := make([]*Node, 0)
 
-			factors := make([]*NodeList, 0, len(set))
+			factors := make([][]*Node, 0, len(set))
 			for i := 0; i < len(set); i++ {
-				factors = append(factors, set[i].llist)
+				factors = append(factors, set[i].nodes)
 			}
 
+			last := -1
 		nomorecommon:
-			for factors[0] != nil {
-				for i := 1; i < len(factors); i++ {
-					if factors[0].n.left != factors[i].n.left {
+			for i := 0; i < len(factors[0]); i++ {
+				for j := 1; j < len(factors); j++ {
+					if i >= len(factors[j]) || factors[0][i].left != factors[j][i].left {
 						break nomorecommon
 					}
-					factors[i] = factors[i].next
 				}
-				common.add(factors[0].n)
-				factors[0] = factors[0].next
+				common = append(common, factors[0][i])
+			}
+
+			// CODE : I don't like how nodeRuleFromFactoring is used,
+			// doesn't really make sense to have a cons, come back to fix
+			for i := 0; i < len(factors); i++ {
+				if last >= len(factors[i]) {
+					continue
+				}
+				factors[i] = factors[i][last:]
 			}
 
 			// create a new rule for the common elems, and factor
 			// out from each node
-			fact := nodeRuleFromFactoring(dcl, &factors)
-			top.rlist.add(fact)
+			fact := nodeRuleFromFactoring(dcl, factors)
+			top.nodes = append(top.nodes, fact)
 
 			// CODE : Maybe pull this into a cons? I don't like how it
 			// is very specific, it basically becomes a functions for this
 			// use only
-			newProds.add(&Node{
+			newProds = append(newProds, &Node{
 				op: OPROD,
-				llist: common.concat(nodeAsList(&Node{
+				nodes: append(common, &Node{
 					op:   OPRODELEM,
 					left: fact,
-				})),
+				}),
 			})
 		}
 
-		dcl.rlist = newProds
+		dcl.nodes = newProds
 	}
 }
 
 func removeDirectRecursion(top *Node) {
-	//newRules := new(NodeList)
-	for dcls := top.rlist; dcls != nil; dcls = dcls.next {
-		dcl := dcls.n
+	for _, dcl := range top.nodes {
 		if dcl.op != ORULE {
 			continue
 		}
 
-		nonRec := new(NodeList)
+		nonRec := make([]*Node, 0)
 		var leftRec *Node = nil
 
-		for prods := dcl.rlist; prods != nil; prods = prods.next {
-			prod := prods.n
-			fst := prod.llist.n
+		for _, prod := range dcl.nodes {
+			fst := prod.nodes[0]
 			switch {
 			case fst.left == dcl:
 				if leftRec != nil {
@@ -106,7 +109,7 @@ func removeDirectRecursion(top *Node) {
 				}
 				leftRec = prod
 			default:
-				nonRec.add(prod)
+				nonRec = append(nonRec, prod)
 			}
 		}
 		if leftRec == nil {
@@ -114,28 +117,26 @@ func removeDirectRecursion(top *Node) {
 		}
 
 		rule := nodeRuleFromLeftRecursion(dcl, leftRec)
-		top.rlist.add(rule)
+		top.nodes = append(top.nodes, rule)
 
-		for prods := nonRec; prods != nil; prods = prods.next {
-			prod := prods.n
-			prod.llist.add(rule.prodElem())
+		for _, prod := range nonRec {
+			prod.nodes = append(prod.nodes, rule.prodElem())
 		}
 
-		dcl.rlist = nonRec
+		dcl.nodes = nonRec
 	}
 }
 
 func removeIndirectRecursion(top *Node) {
 }
 
-func buildFirst(n *Node) {
-	if n.op != OGRAM {
+func buildFirst(top *Node) {
+	if top.op != OGRAM {
 		panic("buildFirst called on non OGRAM node")
 	}
 
 	// Init table
-	for dcls := n.rlist; dcls != nil; dcls = dcls.next {
-		dcl := dcls.n
+	for _, dcl := range top.nodes {
 		if dcl.op != ORULE {
 			continue
 		}
@@ -146,18 +147,15 @@ func buildFirst(n *Node) {
 	for anotherPass {
 		anotherPass = false
 
-		for dcls := n.rlist; dcls != nil; dcls = dcls.next {
-			dcl := dcls.n
+		for _, dcl := range top.nodes {
 			if dcl.op != ORULE {
 				continue
 			}
 
 		productions:
-			for prods := dcl.rlist; prods != nil; prods = prods.next {
-				// Productions for rule
-				prod := prods.n
-				for elem := prod.llist; elem != nil; elem = elem.next {
-					e := elem.n.left
+			for _, prod := range dcl.nodes {
+				for _, elem := range prod.nodes {
+					e := elem.left
 					switch e.op {
 					case OEPSILON:
 						if !cc.first[dcl][e] {
@@ -203,8 +201,7 @@ func buildFollow(top *Node) {
 	}
 
 	// Init table
-	for dcls := top.rlist; dcls != nil; dcls = dcls.next {
-		dcl := dcls.n
+	for _, dcl := range top.nodes {
 		if dcl.op != ORULE {
 			continue
 		}
@@ -215,24 +212,21 @@ func buildFollow(top *Node) {
 	for anotherPass {
 		anotherPass = false
 
-		for dcls := top.rlist; dcls != nil; dcls = dcls.next {
-			dcl := dcls.n
+		for _, dcl := range top.nodes {
 			if dcl.op != ORULE {
 				continue
 			}
 
-			for prods := dcl.rlist; prods != nil; prods = prods.next {
-				// Productions for rule
-				prod := prods.n
-				for elem := prod.llist; elem != nil; elem = elem.next {
-					e := elem.n.left
+			for _, prod := range dcl.nodes {
+				for j, elem := range prod.nodes {
+					e := elem.left
 					if e.op != ORULE {
 						continue
 					}
 
 					var next *Node = nil
-					if elem.next != nil {
-						next = elem.next.n.left
+					if j+1 < len(prod.nodes) {
+						next = prod.nodes[j+1].left
 					}
 
 					if next != nil {
@@ -312,17 +306,15 @@ func printFollow(top *Node) {
 }
 
 func ll1Check(top *Node) {
-	for dcls := top.rlist; dcls != nil; dcls = dcls.next {
-		dcl := dcls.n
+	for _, dcl := range top.nodes {
 		if dcl.op != ORULE {
 			continue
 		}
 
 		disjoint := make(map[*Node]bool)
 		followNotAdded := true
-		for prods := dcl.rlist; prods != nil; prods = prods.next {
-			prod := prods.n
-			fst := prod.llist.n.left
+		for _, prod := range dcl.nodes {
+			fst := prod.nodes[0].left
 			if fst == nil {
 				panic("unexpected nil in production element list")
 			}
@@ -373,8 +365,12 @@ func typeCheck(top *Node) {
 	// 1. Perform transformation of the grammar, aiding the user
 	// in writing a LL(1) language.
 	leftFactor(top)
-	removeDirectRecursion(top)
-	removeIndirectRecursion(top)
+	//removeDirectRecursion(top)
+	//removeIndirectRecursion(top)
+
+	if cc.opt['t'] {
+		top.dumpTree()
+	}
 
 	// 2. Create first and follow sets to analyze the transformed
 	// grammar.
@@ -387,5 +383,5 @@ func typeCheck(top *Node) {
 	}
 
 	// 3. Check for LL(1) grammar
-	ll1Check(top)
+	//ll1Check(top)
 }

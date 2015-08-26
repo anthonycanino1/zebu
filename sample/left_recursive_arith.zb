@@ -7,11 +7,15 @@ start
 	;
 
 expr
-	: term
-	| expr '+' term
-	| expr '-' term
+	: term '+' expr
+	| term '-' expr
 	;
 
+term
+	: '0'
+	;
+
+/*
 term
 	: factor
 	| term '*' factor
@@ -22,3 +26,4 @@ factor
 	: '(' expr ')'
 	| Integer
 	;
+	*/

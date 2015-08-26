@@ -53,8 +53,6 @@ type Node struct {
 	// Node shape
 	left  *Node
 	right *Node
-	llist *NodeList
-	rlist *NodeList
 	nodes []*Node
 	ntype *Node
 
@@ -121,30 +119,23 @@ func (n *Node) prodElem() *Node {
 func (n *Node) dcopy(c *Node) *Node {
 	n.left = c.left
 	n.right = c.right
-	n.llist = c.llist
-	n.rlist = c.rlist
+	n.nodes = c.nodes
 	n.op = c.op
 	return n
 }
 
-func nodeAsList(n *Node) *NodeList {
-	return n.list()
-}
-
-func nodeRuleFromFactoring(dcl *Node, remain *[]*NodeList) (rule *Node) {
-	prods := new(NodeList)
-	for i := 0; i < len(*remain); i++ {
-		elmns := (*remain)[i]
-		if elmns == nil {
-			elmn := &Node{
+func nodeRuleFromFactoring(dcl *Node, remain [][]*Node) (rule *Node) {
+	prods := make([]*Node, 0)
+	for _, elmns := range remain {
+		if len(elmns) == 0 {
+			elmns = append(elmns, &Node{
 				op:   OPRODELEM,
 				left: nepsilon,
-			}
-			elmns = elmn.list()
+			})
 		}
-		prods.add(&Node{
+		prods = append(prods, &Node{
 			op:    OPROD,
-			llist: elmns,
+			nodes: elmns,
 		})
 	}
 
@@ -153,7 +144,7 @@ func nodeRuleFromFactoring(dcl *Node, remain *[]*NodeList) (rule *Node) {
 	rule = &Node{
 		op:    ORULE,
 		sym:   s,
-		rlist: prods,
+		nodes: prods,
 	}
 	declare(rule)
 	return
@@ -167,18 +158,18 @@ func nodeRuleFromLeftRecursion(dcl *Node, prod *Node) (rule *Node) {
 		sym: s,
 	}
 	declare(rule)
-	remain := prod.llist.tail()
+	remain := prod.nodes[1:]
 
-	prods := new(NodeList)
-	prods.add(&Node{
+	prods := make([]*Node, 0)
+	prods = append(prods, &Node{
 		op:    OPROD,
-		llist: nepsilon.prodElem().list(),
+		nodes: []*Node{nepsilon.prodElem()},
 	})
-	prods.add(&Node{
+	prods = append(prods, &Node{
 		op:    OPROD,
-		llist: remain.add(rule.prodElem()),
+		nodes: append(remain, rule.prodElem()),
 	})
-	rule.rlist = prods
+	rule.nodes = prods
 	return
 }
 
@@ -289,22 +280,20 @@ func (n *Node) dumpOneLevel() {
 	if n == nil || n.op != ORULE {
 		panic("dumpOneLevel is for debug purposes only, called on non ORULE node")
 	}
-	for l := n.rlist; l != nil; l = l.next {
-		prod := l.n
+	for _, prod := range n.nodes {
 		fmt.Printf("\t-Prod\n")
-		for l2 := prod.llist; l2 != nil; l2 = l2.next {
-			elem := l2.n.left
-			switch elem.op {
+		for _, elem := range prod.nodes {
+			switch elem.left.op {
 			case ORULE:
-				fmt.Printf("\t\t-Nonterminal: %s\n", elem.sym)
+				fmt.Printf("\t\t-Nonterminal: %s\n", elem.left.sym)
 			case OREGDEF:
-				fmt.Printf("\t\t-Terminal: %s\n", elem.sym)
+				fmt.Printf("\t\t-Terminal: %s\n", elem.left.sym)
 			case OSTRLIT:
-				fmt.Printf("\t\t-Terminal: '%s'\n", escapeStrlit(elem.lit.lit))
+				fmt.Printf("\t\t-Terminal: '%s'\n", escapeStrlit(elem.left.lit.lit))
 			case OEPSILON:
 				fmt.Printf("\t\t-Epsilon\n")
 			default:
-				panic(fmt.Sprintf("unexpected op %s in production element\n", elem.op))
+				panic(fmt.Sprintf("unexpected op %s in production element\n", elem.left.op))
 			}
 		}
 	}
@@ -324,8 +313,8 @@ func walkdump(n *Node, w *Writer) {
 		w.writeln("(GRAMMAR: %s", n.sym)
 		w.enter()
 
-		for l := n.rlist; l != nil; l = l.next {
-			walkdump(l.n, w)
+		for _, n2 := range n.nodes {
+			walkdump(n2, w)
 		}
 
 		w.writeln(")")
@@ -367,8 +356,8 @@ func walkdump(n *Node, w *Writer) {
 	case OCLASS:
 		w.writeln("(OCLASS")
 		w.enter()
-		for l := n.llist; l != nil; l = l.next {
-			walkdump(l.n, w)
+		for _, n2 := range n.nodes {
+			walkdump(n2, w)
 		}
 		w.writeln(")")
 		w.exit()
@@ -380,6 +369,8 @@ func walkdump(n *Node, w *Writer) {
 		w.exit()
 	case OCHAR:
 		w.writeln("(OCHAR '%c')", n.byt)
+	case OSTRLIT:
+		w.writeln("(OSTRLIT '%s')", escapeStrlit(n.lit.lit))
 	case ORULE:
 		w.write("(RULE: %s", n.sym)
 		if n.ntype != nil {
@@ -389,8 +380,8 @@ func walkdump(n *Node, w *Writer) {
 		w.newline()
 		w.enter()
 
-		for l := n.rlist; l != nil; l = l.next {
-			walkdump(l.n, w)
+		for _, n2 := range n.nodes {
+			walkdump(n2, w)
 		}
 
 		w.writeln(")")
@@ -399,26 +390,25 @@ func walkdump(n *Node, w *Writer) {
 		w.writeln("(OPROD ")
 		w.enter()
 
-		for l := n.llist; l != nil; l = l.next {
+		for _, n2 := range n.nodes {
 			// Dip directly into PRODELEM
-			n1 := l.n
-			switch n1.left.op {
+			switch n2.left.op {
 			case ORULE:
-				w.writeln("(TERMINAL: %s)", n1.left.sym)
+				w.writeln("(TERMINAL: %s)", n2.left.sym)
 			case OREGDEF:
-				w.writeln("(NONTERMINAL: %s)", n1.left.sym)
+				w.writeln("(NONTERMINAL: %s)", n2.left.sym)
 			case OSTRLIT:
-				w.writeln("(STRLIT: '%s')", escapeStrlit(n1.left.lit.lit))
+				w.writeln("(STRLIT: '%s')", escapeStrlit(n2.left.lit.lit))
 			case OEPSILON:
 				w.writeln("(OEPSILON)")
 			case ONONAME:
-				w.writeln("(ONONAME: %s)", n1.left.sym)
+				w.writeln("(ONONAME: %s)", n2.left.sym)
 			}
 			w.enter()
-			if n1.svar != nil {
-				w.writeln("(VARID: %s)", n1.svar)
+			if n2.svar != nil {
+				w.writeln("(VARID: %s)", n2.svar)
 			}
-			if n1.right != nil {
+			if n2.right != nil {
 				w.writeln("(ACTION)")
 			}
 			w.exit()

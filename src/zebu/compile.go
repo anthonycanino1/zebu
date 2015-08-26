@@ -265,9 +265,10 @@ func init() {
 		follow:       make(map[*Node]map[*Node]bool),
 	}
 
-	flag.BoolVar(&cc.opt['h'], "help", false, "print this help message")
-	flag.BoolVar(&cc.opt['d'], "dump", false, "dump the AST after parsing")
-	flag.BoolVar(&cc.opt['g'], "grammar", false, "print semantic information about grammar construction")
+	flag.BoolVar(&cc.opt['h'], "h", false, "print this help message")
+	flag.BoolVar(&cc.opt['d'], "d", false, "dump the AST after parsing")
+	flag.BoolVar(&cc.opt['t'], "t", false, "dump the AST after transformation")
+	flag.BoolVar(&cc.opt['g'], "g", false, "print semantic information about grammar construction")
 
 	// Populate symbol table with known symbols
 	for i := 0; i < len(syms); i++ {
@@ -378,16 +379,14 @@ func walkResolve(n *Node) *Node {
 	case ONONAME:
 		return resolve(n)
 	case OGRAM:
-		for l := n.rlist; l != nil; l = l.next {
-			l.n = walkResolve(l.n)
+		for i := 0; i < len(n.nodes); i++ {
+			n.nodes[i] = walkResolve(n.nodes[i])
 		}
 	case ORULE:
-		for l := n.rlist; l != nil; l = l.next {
-			prod := l.n
-			for l2 := prod.llist; l2 != nil; l2 = l2.next {
-				// Dip into prodelems
-				elem := l2.n
-				elem.left = walkResolve(elem.left)
+		for i := 0; i < len(n.nodes); i++ {
+			for j := 0; j < len(n.nodes[i].nodes); j++ {
+				// TODO : Might want to remove the extra lookups
+				n.nodes[i].nodes[j].left = walkResolve(n.nodes[i].nodes[j].left)
 			}
 		}
 	case OREGDEF:
@@ -410,7 +409,7 @@ func Main() {
 
 	// Pass #1: Parse grammar (dependencies must be in include path)
 	name := args[0]
-	grammar := cc.parser.parse(name)
+	top := cc.parser.parse(name)
 	if cc.numTotalErrs > 0 {
 		cc.flushErrors()
 		return
@@ -418,17 +417,17 @@ func Main() {
 
 	// Pass #1.5: Resolve symbols (this resolution should be pushed
 	// into Pass #2 in the future to amortize the cost).
-	grammar = resolveSymbols(grammar)
+	top = resolveSymbols(top)
 	if cc.numTotalErrs > 0 {
 		cc.flushErrors()
 		return
 	}
 
-	typeCheck(grammar)
-
 	if cc.opt['d'] {
-		grammar.dumpTree()
+		top.dumpTree()
 	}
+
+	typeCheck(top)
 
 	// Pass #2: Perform semantic analysis over the grammar. Transforms
 	// the grammar to a valid LL(1) grammar if possible. At this point,

@@ -21,6 +21,10 @@ TokRBrack       : ']'  ;
 TokRange        : '-'  ;
 TokAt           : '@'  ;
 
+start
+	: program
+	;
+
 program
   : regular_definitions
   ;

@@ -393,7 +393,7 @@ func (p *Parser) parseProdElem() (n *Node, err error) {
 		nn, err = p.parseNonterm()
 	case STRLIT:
 		nn, err = p.parseStrlit()
-	case '|', '{':
+	case '|', '{', ';':
 		nn, err = p.parseEpsilon()
 	default:
 		err = cc.error(p.lh.pos, "unexpected %s.", p.lh)
