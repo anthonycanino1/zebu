@@ -1,3 +1,9 @@
+// compile.go
+// Copyright 2015 The Zebu Authors. All rights reserved.
+//
+// LAST : Position info needs a bit more, probably do the
+// go style save last sym pos
+
 package zebu
 
 import (
@@ -65,7 +71,7 @@ func (t *StrlitTab) dump() {
 type Sym struct {
 	name string
 	link *Sym
-	pos  *Position
+	pos  *Position // valid after declare(n)
 	gram *Grammar
 	defn *Node
 	defv bool
@@ -99,6 +105,7 @@ var syms = []struct {
 	{"modify", MODIFY},
 }
 
+// TODO : Think this should be switched to a []*Sym
 type SymList struct {
 	s    *Sym
 	next *SymList
@@ -136,8 +143,6 @@ func newSymTab() (t *SymTab) {
 	return
 }
 
-// TODO : Might want to move this from a global function to operate
-// directly on the Compiler type
 func (t *SymTab) lookup(s string) *Sym {
 	return t.lookupGrammar(s, cc.localGrammar)
 }
@@ -294,6 +299,7 @@ func newname(s *Sym) *Node {
 	return &Node{
 		op:  ONONAME,
 		sym: s,
+		pos: cc.pos,
 	}
 }
 
@@ -307,6 +313,7 @@ func oldname(s *Sym) (n *Node) {
 	return
 }
 
+// TODO : Check for position
 func declare(n *Node) {
 	s := n.sym
 	if s.defn != nil && s.defn.op != ONONAME {
@@ -428,6 +435,11 @@ func Main() {
 	}
 
 	typeCheck(top)
+
+	if cc.numTotalErrs > 0 {
+		cc.flushErrors()
+		return
+	}
 
 	// Pass #2: Perform semantic analysis over the grammar. Transforms
 	// the grammar to a valid LL(1) grammar if possible. At this point,

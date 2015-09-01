@@ -1,0 +1,28 @@
+// compile
+// Copyright 2015 The Zebu Authors. All rights reserved.
+// Test: left recursive, left associative expr grammar.
+
+grammar ll_arith;
+
+INTEGER : [1-9][0-9]* ;
+
+start
+  : expr
+  ;
+
+expr
+  : term
+  | expr '+' term
+  | expr '-' term
+  ;
+
+term
+  : factor
+  | term '*' factor
+  | term '/' factor
+  ;
+
+factor
+  : INTEGER
+  | '(' expr ')'
+  ;

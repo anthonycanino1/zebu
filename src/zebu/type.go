@@ -59,6 +59,10 @@ func leftFactor(top *Node) {
 					}
 				}
 				common = append(common, factors[0][i])
+				last = i
+			}
+			if (last == -1) {
+				panic("nothing found in common after determing a common path")
 			}
 
 			// CODE : I don't like how nodeRuleFromFactoring is used,
@@ -67,7 +71,7 @@ func leftFactor(top *Node) {
 				if last >= len(factors[i]) {
 					continue
 				}
-				factors[i] = factors[i][last:]
+				factors[i] = factors[i][last+1:]
 			}
 
 			// create a new rule for the common elems, and factor
@@ -76,7 +80,7 @@ func leftFactor(top *Node) {
 			top.nodes = append(top.nodes, fact)
 
 			// CODE : Maybe pull this into a cons? I don't like how it
-			// is very specific, it basically becomes a functions for this
+			// is very specific, it basically becomes a function for this
 			// use only
 			newProds = append(newProds, &Node{
 				op: OPROD,
@@ -321,14 +325,22 @@ func ll1Check(top *Node) {
 			switch fst.op {
 			case OSTRLIT, OREGDEF:
 				if disjoint[fst] {
-					fmt.Printf("%s is ambiguous\n", dcl.sym)
+					if (dcl.orig != nil) {
+						cc.error(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
+					} else {
+						cc.error(dcl.pos, "%s is ambiguous", dcl.sym)
+					}
 				}
 				disjoint[fst] = true
 			case OEPSILON:
 				if followNotAdded {
 					for k, _ := range cc.follow[dcl] {
 						if disjoint[k] {
-							fmt.Printf("%s is ambiguous\n", dcl.sym)
+							if (dcl.orig != nil) {
+								cc.error(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
+							} else {
+								cc.error(dcl.pos, "%s is ambiguous", dcl.sym)
+							}
 						}
 						disjoint[k] = true
 					}
@@ -339,7 +351,11 @@ func ll1Check(top *Node) {
 					// Use follow[dcl]
 					for k, _ := range cc.follow[dcl] {
 						if disjoint[k] {
-							fmt.Printf("%s is ambiguous\n", dcl.sym)
+							if (dcl.orig != nil) {
+								cc.error(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
+							} else {
+								cc.error(dcl.pos, "%s is ambiguous", dcl.sym)
+							}
 						}
 						disjoint[k] = true
 					}
@@ -348,7 +364,12 @@ func ll1Check(top *Node) {
 					// Use first[fst]
 					for k, _ := range cc.first[fst] {
 						if disjoint[k] {
-							fmt.Printf("%s is ambiguous\n", dcl.sym)
+							fmt.Printf("fst: %s  --  %s not disjoint in %s\n", fst.sym, dcl.sym, k)
+							if (dcl.orig != nil) {
+								cc.error(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
+							} else {
+								cc.error(dcl.pos, "%s is ambiguous", dcl.sym)
+							}
 						}
 						disjoint[k] = true
 					}
@@ -361,11 +382,13 @@ func ll1Check(top *Node) {
 	}
 }
 
+// LAST : Check leftFactor and removeDirectRecursion again
+
 func typeCheck(top *Node) {
 	// 1. Perform transformation of the grammar, aiding the user
 	// in writing a LL(1) language.
 	leftFactor(top)
-	//removeDirectRecursion(top)
+	removeDirectRecursion(top)
 	//removeIndirectRecursion(top)
 
 	if cc.opt['t'] {
@@ -383,5 +406,5 @@ func typeCheck(top *Node) {
 	}
 
 	// 3. Check for LL(1) grammar
-	//ll1Check(top)
+	ll1Check(top)
 }

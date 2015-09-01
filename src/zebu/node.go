@@ -55,13 +55,15 @@ type Node struct {
 	right *Node
 	nodes []*Node
 	ntype *Node
+	orig  *Node
 
 	// Common
-	op  NodeOp
-	sym *Sym
-	lit *Strlit
-	byt byte
-	pos *Position
+	op      NodeOp
+	sym     *Sym
+	lit     *Strlit
+	byt     byte
+	pos     *Position
+	isError bool
 
 	// Walking
 	resolve  bool
@@ -96,14 +98,6 @@ func (n *Node) String() string {
 	default:
 		return fmt.Sprintf("%s", n.op)
 	}
-}
-
-func (n *Node) list() *NodeList {
-	nl := new(NodeList)
-	nl.n = n
-	nl.next = nil
-	nl.end = nl
-	return nl
 }
 
 func (n *Node) prodElem() *Node {
@@ -145,6 +139,7 @@ func nodeRuleFromFactoring(dcl *Node, remain [][]*Node) (rule *Node) {
 		op:    ORULE,
 		sym:   s,
 		nodes: prods,
+		orig:  dcl,
 	}
 	declare(rule)
 	return
@@ -154,8 +149,9 @@ func nodeRuleFromLeftRecursion(dcl *Node, prod *Node) (rule *Node) {
 	rname := primeName(dcl.sym.name)
 	s := cc.symbols.lookup(rname)
 	rule = &Node{
-		op:  ORULE,
-		sym: s,
+		op:   ORULE,
+		sym:  s,
+		orig: dcl,
 	}
 	declare(rule)
 	remain := prod.nodes[1:]
@@ -171,49 +167,6 @@ func nodeRuleFromLeftRecursion(dcl *Node, prod *Node) (rule *Node) {
 	})
 	rule.nodes = prods
 	return
-}
-
-type NodeList struct {
-	n    *Node
-	next *NodeList
-	end  *NodeList
-}
-
-func (l *NodeList) tail() *NodeList {
-	if l.next == nil {
-		panic("Cannot take the tail of a single element list")
-	}
-	l.next.end = l.end
-	return l.next
-}
-
-func (l *NodeList) concat(r *NodeList) *NodeList {
-	l.end.next = r
-	l.end = r.end
-	r.end = nil
-	return l
-}
-
-func (l *NodeList) add(n *Node) *NodeList {
-	if n == nil {
-		return l
-	}
-	if l.n != nil {
-		return l.concat(n.list())
-	} else {
-		l.n = n
-		l.end = l
-	}
-	return l
-}
-
-// TODO : We can cache this to optimize later
-func (l *NodeList) len() int {
-	ln := 0
-	for l1 := l; l1 != nil; l1 = l1.next {
-		ln++
-	}
-	return ln
 }
 
 func escapeStrlit(s string) string {

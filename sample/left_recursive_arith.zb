@@ -7,11 +7,12 @@ start
 	;
 
 expr
-	: term '+' expr
-	| term '-' expr
+	: term
+	| expr '+' term
+	| expr '-' term
 	;
 
-term
+term 
 	: '0'
 	;
 

@@ -1,0 +1,9 @@
+// error
+// Copyright 2015 The Zebu Authors. All rights reserved.
+// Test: missing start rule should flag error at grammar start.
+
+grammar bad_start;	// ERROR grammar must define a start rule
+
+expr
+	: '0'
+	;

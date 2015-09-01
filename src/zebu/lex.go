@@ -314,24 +314,32 @@ lex_begin:
 
 	case '/':
 		l.getc()
-		if l.ch != '*' {
-			l.putc(l.ch)
-			l.ch = '/'
-			break
-		}
-		for {
+		switch l.ch {
+		case '/':
 			l.getc()
-			if l.ch == 0 {
-				goto lex_begin
-			}
-			if l.ch == '*' {
+			for l.ch != '\n' {
 				l.getc()
-				if l.ch == '/' {
-					break
+			}
+			goto lex_whitespace
+		case '*':
+			for {
+				l.getc()
+				if l.ch == 0 {
+					goto lex_begin
+				}
+				if l.ch == '*' {
+					l.getc()
+					if l.ch == '/' {
+						break
+					}
 				}
 			}
+			goto lex_whitespace
+
+		default:
+			l.putc(l.ch)
+			l.ch = '/'
 		}
-		goto lex_whitespace
 	}
 
 	// This is meant to be the default

@@ -549,12 +549,10 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 		return
 	}
 
-	n = &Node{
-		op:    OGRAM,
-		nodes: make([]*Node, 0),
-	}
-	n.sym = s
-	//declare(n)
+	n = newname(s)
+	n.op = OGRAM
+	n.nodes = make([]*Node, 0)
+	declare(n)
 
 	p.match(';')
 
@@ -591,7 +589,7 @@ func (p *Parser) parse(f string) (n *Node) {
 
 	// 3. Check to make sure we have a start rule
 	if n.left == nil {
-		cc.error(cc.pos, "grammar must define a start rule.")
+		cc.error(n.pos, "grammar must define a start rule.")
 	}
 
 	return
