@@ -363,6 +363,7 @@ lex_alpha:
 	}
 	t.sym = cc.symbols.lookup(string(lxbuf[:cp]))
 	t.kind = t.sym.lexical
+	t.sym.pos = t.pos
 	if t.kind == NAME {
 		// Refine the kind to be more specific
 		switch {

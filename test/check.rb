@@ -39,31 +39,53 @@ def do_compile_command(name, file)
   end
 end
 
+def parse_output(output)
+  errors = {}
+  output.lines do |line|
+		ln = line.split(":")[1].to_i
+		if errors[ln].nil?
+			errors[ln] = [line.strip]
+		else
+			errors[ln] << line.strip
+		end
+  end
+  return errors
+end
+
 # error command is much harder
 def do_error_command(name, file) 
   output, result = compile_file(name)
+  errors = parse_output(output)
   saved = []
   ln = 1  # first line is already parsed, start loop at 2
   file.each do |line| 
     ln = ln + 1
     match = line.match(/(\/\/+).*ERROR(.*)/)
     unless !match.nil? && match[1].length == 2 
+			unless errors[ln].nil?
+				errors[ln].each do |err|
+					saved << [err, ""]
+				end
+			end
       next
     end
-    regex = "#{name}:#{ln}:.+:.*#{Regexp.escape(match[2].strip)}"
-    regelse = "#{name}:#{ln}:.+:.*"
-    
-    omatch = output.match(regex)
 
-    if omatch.nil? 
-      ematch = output.match(regelse)
-      if ematch.nil?
-        saved << [regex, "no match"]
-      else
-        saved << [regex, ematch[0]]
-      end
+    regex = "#{name}:#{ln}:.+:.*#{match[2].strip}"
+    regelse = "#{name}:#{ln}:.+:.*"
+
+		if errors[ln].nil? 
+			saved << [err, regex]
+			next
+		end
+
+    errors[ln].each do |err|
+      omatch = output.match(regex)
+      unless omatch.nil? 
+        next
+			end
+			saved << [err, regex]
     end
-  end
+	end
 
   if saved.length > 0 
     puts "----------------------------------------------------------------------"

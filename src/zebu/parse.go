@@ -282,33 +282,31 @@ func (p *Parser) parseAlt() (n *Node, err error) {
 	return
 }
 
-func (p *Parser) parseRegdefDcl() (n *Node, err error) {
-	n2, err := p.parseAlt()
-	if err != nil {
-		return
-	}
-	n = &Node{
-		op:   OREGDEF,
-		left: n2,
-	}
-	return
-}
-
-func (p *Parser) parseRegdef() (n *Node, err error) {
+func (p *Parser) parseRegdefHead() (n *Node, err error) {
 	s, err := p.parseNontermName()
 	if err != nil {
 		return
 	}
+	n = newname(s)
+	return
+}
+
+func (p *Parser) parseRegdef() (n *Node, err error) {
+	n, err = p.parseRegdefHead()
+	if err != nil {
+		return
+	}
+	n.op = OREGDEF
+	declare(n)
+
 	_, err = p.match(':')
 	if err != nil {
 		return
 	}
-	n, err = p.parseRegdefDcl()
+	n.left, err = p.parseAlt()
 	if err != nil {
 		return
 	}
-	n.sym = s
-	declare(n)
 	return
 }
 

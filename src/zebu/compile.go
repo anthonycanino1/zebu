@@ -71,7 +71,7 @@ func (t *StrlitTab) dump() {
 type Sym struct {
 	name string
 	link *Sym
-	pos  *Position // valid after declare(n)
+	pos  *Position // always points to last position for this sym
 	gram *Grammar
 	defn *Node
 	defv bool
@@ -299,7 +299,7 @@ func newname(s *Sym) *Node {
 	return &Node{
 		op:  ONONAME,
 		sym: s,
-		pos: cc.pos,
+		pos: s.pos,
 	}
 }
 
@@ -317,11 +317,10 @@ func oldname(s *Sym) (n *Node) {
 func declare(n *Node) {
 	s := n.sym
 	if s.defn != nil && s.defn.op != ONONAME {
-		cc.error(cc.pos, "%s previously defined at %s.", s, s.pos)
+		cc.error(s.pos, "%s previously defined at %s.", s, s.defn.pos)
 		return
 	}
 	s.defn = n
-	s.pos = cc.pos
 	return
 }
 
