@@ -1,0 +1,23 @@
+// error
+// Copyright 2015 The Zebu Authors. All rights reserved.
+// Test: simple check for an ambiguous error on expr
+
+grammar ambig1 ;
+
+start
+  : expr
+  ;
+
+expr // ERROR .*is ambiguous
+  : expr1
+  | expr2
+  ;
+
+expr1
+  : '0' '1'
+  ;
+
+expr2
+  : '0' '1'
+  ;
+

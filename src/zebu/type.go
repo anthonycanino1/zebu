@@ -364,7 +364,6 @@ func ll1Check(top *Node) {
 					// Use first[fst]
 					for k, _ := range cc.first[fst] {
 						if disjoint[k] {
-							fmt.Printf("fst: %s  --  %s not disjoint in %s\n", fst.sym, dcl.sym, k)
 							if (dcl.orig != nil) {
 								cc.error(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
 							} else {

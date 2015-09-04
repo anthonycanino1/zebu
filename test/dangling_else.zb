@@ -1,0 +1,25 @@
+// error
+// Copyright 2015 The Zebu Authors. All rights reserved.
+// Test: checks for the standard dangling else problem.
+
+grammar dangling_else ;
+
+start 
+  : stmt ';'
+  ;
+
+stmt
+  : sel_stmt
+  | expr
+  ;
+
+sel_stmt  // ERROR .*is ambiguous
+  : 'if' '(' expr ')' stmt
+  | 'if' '(' expr ')' stmt 'else' stmt
+  ;
+
+expr
+  : '0'
+  ;
+
+
