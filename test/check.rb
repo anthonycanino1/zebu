@@ -74,7 +74,7 @@ def do_error_command(name, file)
     regelse = "#{name}:#{ln}:.+:.*"
 
 		if errors[ln].nil? 
-			saved << [err, regex]
+			saved << ["", regex]
 			next
 		end
 

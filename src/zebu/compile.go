@@ -1,8 +1,6 @@
 // compile.go
 // Copyright 2015 The Zebu Authors. All rights reserved.
 //
-// LAST : Position info needs a bit more, probably do the
-// go style save last sym pos
 
 package zebu
 
@@ -197,7 +195,7 @@ type Compiler struct {
 	localGrammar *Grammar
 	symbols      *SymTab
 	strlits      *StrlitTab
-	symscope     *SymList
+	varids       []*Sym
 	opt          [256]bool
 
 	errors       []*CCError
@@ -268,6 +266,7 @@ func init() {
 		parser:       NewParser(),
 		first:        make(map[*Node]map[*Node]bool),
 		follow:       make(map[*Node]map[*Node]bool),
+		varids:				make([]*Sym, 0, 0),
 	}
 
 	flag.BoolVar(&cc.opt['h'], "h", false, "print this help message")
@@ -340,31 +339,16 @@ func resolve(n *Node) *Node {
 	return s.defn
 }
 
-func marksyms() {
-	if cc.symscope != nil {
-		panic("marking should always start with empty symscope")
-	}
-	cc.symscope = new(SymList)
-}
-
-func pushsym(s *Sym) (err error) {
-	if s.defv {
-		//cc.error("multiply defined varid %s", s)
-		return fmt.Errorf("multiply defined varid %s", s)
-	}
-	cc.symscope = cc.symscope.add(s)
-	s.defv = true
+func pushvarid(s *Sym) (err error) {
+	cc.varids = append(cc.varids, s)
 	return
 }
 
-func popsyms() {
-	for l := cc.symscope; l != nil; l = l.next {
-		if l.s == nil {
-			continue
-		}
-		l.s.defv = false
+func popvarids() {
+	for _, s := range cc.varids {
+		s.defn = nil
 	}
-	cc.symscope = nil
+	cc.varids = cc.varids[:0]
 }
 
 // This is for development purpose only, to take my mind off resolution

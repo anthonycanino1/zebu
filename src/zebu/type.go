@@ -381,8 +381,6 @@ func ll1Check(top *Node) {
 	}
 }
 
-// LAST : Check leftFactor and removeDirectRecursion again
-
 func typeCheck(top *Node) {
 	// 1. Perform transformation of the grammar, aiding the user
 	// in writing a LL(1) language.

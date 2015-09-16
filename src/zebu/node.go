@@ -17,6 +17,7 @@ const (
 	OTYPE
 	OACTION
 	OEPSILON
+	OVARID
 
 	OREGDEF
 	OCAT
@@ -70,7 +71,7 @@ type Node struct {
 	ll1check bool
 
 	// OPRODELEM
-	svar *Sym
+	action *Node
 
 	// OACTION/OTYPE
 	code []byte
@@ -358,10 +359,10 @@ func walkdump(n *Node, w *Writer) {
 				w.writeln("(ONONAME: %s)", n2.left.sym)
 			}
 			w.enter()
-			if n2.svar != nil {
-				w.writeln("(VARID: %s)", n2.svar)
-			}
 			if n2.right != nil {
+				w.writeln("(VARID: %s)", n2.right.sym)
+			}
+			if n2.action != nil {
 				w.writeln("(ACTION)")
 			}
 			w.exit()

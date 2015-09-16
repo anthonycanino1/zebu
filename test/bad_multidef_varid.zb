@@ -1,0 +1,21 @@
+// error
+// Copyright 2015 The Zebu Authors. All rights reserved.
+// Test: check that multiply defined varids are reported
+
+grammar bad_multidef_varid ;
+
+INTEGER : [1-9][0-9]* ;
+
+start 
+  : expr
+  ;
+
+expr
+  : expr=$1 '+' term=$1		// ERROR .*previously defined
+	| term=$1
+  ;
+
+term
+	: term=$1 '*' INTEGER=$1	// ERROR .*previously defined
+	| INTEGER=$1
+	;

@@ -1,0 +1,55 @@
+// compile
+// Copyright 2015 The Zebu Authors. All rights reserved.
+// Test: left recursive, left associative expr grammar with actions
+
+grammar ll_arith ;
+
+INTEGER : [1-9][0-9]* ;
+
+start
+  : expr=$1
+		{ 
+			$$ = $1 
+		}
+  ;
+
+expr=int
+  : term=$1
+		{
+			$$ = $1
+		}
+  | expr=$1 '+' term=$2
+		{
+			$$ = $1 + $2
+		}
+  | expr '-' term
+		{
+			$$ = $1 - $2
+		}
+  ;
+
+term=int
+  : factor=$1
+		{
+			$$ = $1
+		}
+  | term=$1 '*' factor=$2
+		{
+			$$ = $1 * $2
+		}
+  | term '/' factor
+		{
+			$$ = $1 / $2
+		}
+  ;
+
+factor=int
+  : INTEGER=$1
+		{
+			$$ = strconv.Atoi($1)
+		}
+  | '(' expr=$1 ')'
+		{
+			$$ = $1
+		}
+  ;

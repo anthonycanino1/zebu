@@ -26,6 +26,13 @@ func (p *Parser) next() (t *Token) {
 	return
 }
 
+func (p *Parser) check(k TokenKind) bool {
+	if p.lh.kind != k {
+		return false
+	}
+	return true
+}
+
 func (p *Parser) match(k TokenKind) (t *Token, err error) {
 	if t = p.next(); t.kind != k {
 		t = nil
@@ -340,13 +347,14 @@ func (p *Parser) parseAction() (n *Node, err error) {
 	return
 }
 
-func (p *Parser) parseVarId() (s *Sym, err error) {
+func (p *Parser) parseVarId() (n *Node, err error) {
 	t, err := p.match(VARID)
 	if err != nil {
 		return
 	}
-	s = t.sym
-	err = pushsym(s)
+	n = newname(t.sym)
+	n.op = OVARID
+	declare(n)
 	return
 }
 
@@ -405,21 +413,22 @@ func (p *Parser) parseProdElem() (n *Node, err error) {
 	}
 	if p.lh.kind == '=' {
 		p.match('=')
-		n.svar, err = p.parseVarId()
+		n.right, err = p.parseVarId()
 		if err != nil {
 			return
 		}
+		n.right.ntype = n
+		pushvarid(n.right.sym)
 	}
 	if p.lh.kind == '{' {
-		n.right, err = p.parseAction()
+		n.action, err = p.parseAction()
 	}
 	return
 }
 
 func (p *Parser) parseProd() (n *Node, err error) {
 	l := make([]*Node, 0)
-	marksyms()
-	defer popsyms()
+	defer popvarids()
 	for {
 		var nn *Node
 		if nn, err = p.parseProdElem(); err != nil {
@@ -498,7 +507,10 @@ func (p *Parser) parseRule() (n *Node, err error) {
 	declare(n)
 
 	if p.lh.kind == '=' {
-		p.match('=')
+		// TODO : Somewhat hacky to lex/parse right now, clean up
+		// later
+		p.check('=') 
+		p.lexer.Raw()
 		n.ntype, err = p.parseType()
 		if err != nil {
 			return
