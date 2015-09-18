@@ -69,6 +69,7 @@ type Node struct {
 	// Walking
 	resolve  bool
 	ll1check bool
+	pprint   bool
 
 	// OPRODELEM
 	action *Node
@@ -181,84 +182,15 @@ func escapeStrlit(s string) string {
 		}
 	}
 	return b.String()
-}
-
-// Just for dumping the tree right now
-type Writer struct {
-	ind   int
-	onlin bool
-}
-
-func NewWriter() *Writer {
-	w := new(Writer)
-	w.ind = 0
-	w.onlin = false
-	return w
-}
-
-func (w *Writer) enter() {
-	w.ind++
-}
-
-func (w *Writer) exit() {
-	w.ind--
-}
-
-func (w *Writer) doInd() {
-	if !w.onlin {
-		for i := 0; i < w.ind; i++ {
-			fmt.Printf("  ")
-		}
-		w.onlin = true
-	}
-}
-
-func (w *Writer) write(f string, args ...interface{}) {
-	w.doInd()
-	fmt.Printf(f, args...)
-}
-
-func (w *Writer) writeln(f string, args ...interface{}) {
-	w.doInd()
-	fmt.Printf(f, args...)
-	fmt.Print("\n")
-	w.onlin = false
-}
-
-func (w *Writer) newline() {
-	fmt.Printf("\n")
-	w.onlin = false
-}
-
-func (n *Node) dumpOneLevel() {
-	if n == nil || n.op != ORULE {
-		panic("dumpOneLevel is for debug purposes only, called on non ORULE node")
-	}
-	for _, prod := range n.nodes {
-		fmt.Printf("\t-Prod\n")
-		for _, elem := range prod.nodes {
-			switch elem.left.op {
-			case ORULE:
-				fmt.Printf("\t\t-Nonterminal: %s\n", elem.left.sym)
-			case OREGDEF:
-				fmt.Printf("\t\t-Terminal: %s\n", elem.left.sym)
-			case OSTRLIT:
-				fmt.Printf("\t\t-Terminal: '%s'\n", escapeStrlit(elem.left.lit.lit))
-			case OEPSILON:
-				fmt.Printf("\t\t-Epsilon\n")
-			default:
-				panic(fmt.Sprintf("unexpected op %s in production element\n", elem.left.op))
-			}
-		}
-	}
-}
+} 
 
 func (n *Node) dumpTree() {
-	w := NewWriter()
+	w := stdoutCodeWriter()
 	walkdump(n, w)
+	w.flush()
 }
 
-func walkdump(n *Node, w *Writer) {
+func walkdump(n *Node, w *CodeWriter) {
 	if n == nil {
 		return
 	}

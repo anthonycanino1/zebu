@@ -389,7 +389,7 @@ func typeCheck(top *Node) {
 	//removeIndirectRecursion(top)
 
 	if cc.opt['t'] {
-		top.dumpTree()
+		pprint(top)
 	}
 
 	// 2. Create first and follow sets to analyze the transformed
