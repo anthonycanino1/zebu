@@ -1,0 +1,14 @@
+// compile
+// Copyright 2015 The Zebu Authors. All rights reserved.
+// Test: simple check for regex parsing
+
+grammar regex1 ;
+
+ID_START : [_a-zA-Z] ;
+ID_PART  : [_a-zA-Z0-9] ;
+ID			 : ID_START ID_PART * ;
+
+start
+	:
+	;
+

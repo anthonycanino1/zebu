@@ -126,7 +126,7 @@ func pprintWalk(n *Node, w *CodeWriter) {
 	case OREGDEF:
 		w.write("%s : ", n.sym)
 		pprintWalk(n.left, w)
-		w.write("; ")
+		w.write(" ; ")
 		w.newline()
 	case OALT:
 		pprintWalk(n.left, w)
@@ -136,6 +136,7 @@ func pprintWalk(n *Node, w *CodeWriter) {
 		}
 	case OCAT:
 		pprintWalk(n.left, w)
+		w.write(" ")
 		pprintWalk(n.right, w)
 	case OKLEENE:
 		pprintWalk(n.left, w)
