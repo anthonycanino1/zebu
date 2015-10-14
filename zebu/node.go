@@ -3,6 +3,7 @@ package zebu
 import (
 	"bytes"
 	"fmt"
+	"go/ast"
 )
 
 const (
@@ -75,7 +76,9 @@ type Node struct {
 	action *Node
 
 	// OACTION/OTYPE
-	code []byte
+	code  []byte
+	typ   string
+	etype ast.Expr
 
 	// OREPEAT
 	lb int
@@ -182,7 +185,7 @@ func escapeStrlit(s string) string {
 		}
 	}
 	return b.String()
-} 
+}
 
 func (n *Node) dumpTree() {
 	w := stdoutCodeWriter()
@@ -206,7 +209,11 @@ func walkdump(n *Node, w *CodeWriter) {
 		w.writeln(")")
 		w.exit()
 	case OREGDEF:
-		w.writeln("(REGDEF: %s", n.sym)
+		w.write("(REGDEF: %s", n.sym)
+		if n.ntype != nil {
+			w.write(" -- TYPE: %s", n.ntype.typ)
+		}
+		w.newline()
 		w.enter()
 		walkdump(n.left, w)
 		w.writeln(")")
@@ -260,8 +267,7 @@ func walkdump(n *Node, w *CodeWriter) {
 	case ORULE:
 		w.write("(RULE: %s", n.sym)
 		if n.ntype != nil {
-			nn := n.ntype
-			w.write(" -- TYPE: %s", string(nn.code))
+			w.write(" -- TYPE: %s", n.ntype.typ)
 		}
 		w.newline()
 		w.enter()

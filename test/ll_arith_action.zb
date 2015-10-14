@@ -4,7 +4,7 @@
 
 grammar ll_arith ;
 
-INTEGER : [1-9][0-9]* ;
+INTEGER=int : [1-9][0-9]* ;
 
 start
   : expr=$1

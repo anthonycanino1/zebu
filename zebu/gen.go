@@ -177,3 +177,11 @@ func pprintWalk(n *Node, w *CodeWriter) {
 		w.write("'%s'", n.lit.lit)
 	}
 }
+
+func codeGen(top *Node) {
+}
+
+func codeDump(top *Node) {
+}
+
+

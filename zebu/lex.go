@@ -33,6 +33,8 @@ const (
 	OVERRIDE
 	DELETE
 	MODIFY
+	LEXER
+	PARSER
 )
 
 var tokenLabels = map[TokenKind]string{
@@ -56,6 +58,8 @@ var tokenLabels = map[TokenKind]string{
 	OVERRIDE: "override",
 	DELETE:   "delete",
 	MODIFY:   "modify",
+	LEXER:    "lexer",
+	PARSER:   "parser",
 }
 
 func (k TokenKind) String() string {
@@ -242,7 +246,7 @@ func (l *Lexer) strEscape() byte {
 	}
 }
 
-func (l *Lexer) Raw() byte {
+func (l *Lexer) raw() byte {
 	c := l.ch
 	l.getc()
 	return c

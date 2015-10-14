@@ -1,0 +1,15 @@
+// error
+// Copyright 2015 The Zebu Authors. All rights reserved.
+// Test: malformed type declarations on regdefs and rules should error
+
+grammar missing_type_decl ;
+
+INTEGER= : [1-9][0-9]* ;	// ERROR expected type
+
+start
+  : expr
+  ;
+
+expr=		// ERROR expected type
+	: '0'
+	;

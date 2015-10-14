@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/anthonycanino1/zebu/src/zebu"
+	"github.com/anthonycanino1/zebu/zebu"
 )
 
 func main() {

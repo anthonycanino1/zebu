@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"sort"
+	"go/ast"
 )
 
 type Strlit struct {
@@ -81,14 +82,6 @@ func (s *Sym) String() string {
 	return s.name
 }
 
-func (s *Sym) list() *SymList {
-	sl := new(SymList)
-	sl.s = s
-	sl.next = nil
-	sl.tail = sl
-	return sl
-}
-
 var syms = []struct {
 	name string
 	kind TokenKind
@@ -101,32 +94,8 @@ var syms = []struct {
 	{"override", OVERRIDE},
 	{"delete", DELETE},
 	{"modify", MODIFY},
-}
-
-// TODO : Think this should be switched to a []*Sym
-type SymList struct {
-	s    *Sym
-	next *SymList
-	tail *SymList
-}
-
-func (l *SymList) concat(r *SymList) *SymList {
-	l.tail.next = r
-	l.tail = r.tail
-	return l
-}
-
-func (l *SymList) add(s *Sym) *SymList {
-	if s == nil {
-		return l
-	}
-	if l.s != nil {
-		return l.concat(s.list())
-	} else {
-		l.s = s
-		l.tail = l
-	}
-	return l
+	{"lexer", LEXER},
+	{"parser", PARSER},
 }
 
 type SymTab struct {
@@ -174,6 +143,28 @@ func (t *SymTab) dump() {
 	}
 }
 
+// TODO : Not sure I want this as a named type, but will leave it for now
+type TypeTab struct {
+	table map[string]ast.Expr
+}
+
+func (t *TypeTab) lookup(s string) (e ast.Expr, ok bool) {
+	e, ok = t.table[s]
+	return
+}
+
+func (t *TypeTab) insert(s string, typ ast.Expr) {
+	t.table[s] = typ
+}
+
+func newTypeTab() (t *TypeTab) {
+	t = &TypeTab{
+		table: make(map[string]ast.Expr),
+	}
+
+	return
+}
+
 type Grammar struct {
 	name string
 }
@@ -194,9 +185,12 @@ type Compiler struct {
 
 	localGrammar *Grammar
 	symbols      *SymTab
+	types        *TypeTab
 	strlits      *StrlitTab
 	varids       []*Sym
 	opt          [256]bool
+
+	unionval map[string]string
 
 	errors       []*CCError
 	numSavedErrs int
@@ -215,6 +209,13 @@ type CCError struct {
 
 func (ce *CCError) Error() string {
 	return ce.msg
+}
+
+func newCCError(p *Position, msg string, args ...interface{}) (*CCError) {
+	return &CCError{
+		pos: p,
+		msg: fmt.Sprintf(msg, args...),
+	}
 }
 
 type CCErrorByPos []*CCError
@@ -237,9 +238,17 @@ func (a CCErrorByPos) Less(i, j int) bool {
 }
 
 func (c *Compiler) error(p *Position, msg string, args ...interface{}) (ce *CCError) {
-	ce = &CCError{
+	ce = newCCError(p, msg, args...)
+	c.errors = append(c.errors, ce)
+	c.numSavedErrs++
+	c.numTotalErrs++
+	return
+}
+
+func (c *Compiler) reerror(p *Position, re *CCError) (ce *CCError) {
+	ce = &CCError {
 		pos: p,
-		msg: fmt.Sprintf(msg, args...),
+		msg: re.msg,
 	}
 	c.errors = append(c.errors, ce)
 	c.numSavedErrs++
@@ -261,12 +270,14 @@ func init() {
 	cc = &Compiler{
 		localGrammar: localGrammar,
 		symbols:      newSymTab(),
+		types:        newTypeTab(),
 		strlits:      newStrlitTab(),
 		errors:       make([]*CCError, 0, 10),
 		parser:       NewParser(),
 		first:        make(map[*Node]map[*Node]bool),
 		follow:       make(map[*Node]map[*Node]bool),
-		varids:				make([]*Sym, 0, 0),
+		varids:       make([]*Sym, 0, 0),
+		unionval:     make(map[string]string),
 	}
 
 	flag.BoolVar(&cc.opt['h'], "h", false, "print this help message")
@@ -417,6 +428,7 @@ func Main() {
 		top.dumpTree()
 	}
 
+	// Pass #2: Type check and transform the tree into a valid LL(1) grammar.
 	typeCheck(top)
 
 	if cc.numTotalErrs > 0 {
@@ -424,15 +436,13 @@ func Main() {
 		return
 	}
 
-	// Pass #2: Perform semantic analysis over the grammar. Transforms
-	// the grammar to a valid LL(1) grammar if possible. At this point,
-	// we may still have unresolved ONONAME. Amortize the cost of
-	// resolution inside the pass.
-	//semanticPass(grammar)
+	// Pass #3: Generate code in memory for the generated compiler. At this point
+	// we should be error free. Use panics to check for cases that should never
+	// occur.
+	codeGen(top)
 
-	// Pass #3: Generate a DFA for the lexer
-
-	// Pass #4: Codegen
+	// Pass #4: Dump out the generated code
+	codeDump(top)
 
 	return
 }

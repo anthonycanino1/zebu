@@ -2,6 +2,8 @@ package zebu
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
 )
 
 // Debug, erase when done
@@ -298,6 +300,7 @@ func (p *Parser) parseRegdefHead() (n *Node, err error) {
 	return
 }
 
+// TODO : Refactor the RuleHead/RegDef Head, can move declare
 func (p *Parser) parseRegdef() (n *Node, err error) {
 	n, err = p.parseRegdefHead()
 	if err != nil {
@@ -305,6 +308,18 @@ func (p *Parser) parseRegdef() (n *Node, err error) {
 	}
 	n.op = OREGDEF
 	declare(n)
+
+	if p.lh.kind == '=' {
+		// TODO : Somewhat hacky to lex/parse right now, clean up
+		// later
+		lpos := p.lh.pos
+		p.check('=')
+		p.lexer.raw()
+		if n.ntype, err = p.parseType(); err != nil {
+			err = cc.reerror(lpos, err.(*CCError))
+			return
+		}
+	}
 
 	_, err = p.match(':')
 	if err != nil {
@@ -325,7 +340,7 @@ func (p *Parser) parseAction() (n *Node, err error) {
 	lvl := 0
 	codebuf := make([]byte, 512)
 	for {
-		c := p.lexer.Raw()
+		c := p.lexer.raw()
 		if c == '}' && lvl == 0 {
 			break
 		}
@@ -463,33 +478,93 @@ func (p *Parser) parseRuleBody() (l []*Node, err error) {
 	return
 }
 
-// Let's do some semantic analysis here, check that
-// a type is actually a valid go type.
+// TODO : This one is big, this is very ugly. Right now this is
+// a mini lexer inside the parser. This should be swapped out for
+// actual type checking, possibly using some of the APIs go provides.
 func (p *Parser) parseType() (n *Node, err error) {
-	// For now, just grab the raw string
-	typ := make([]byte, 10, 10)
+	typ := make([]byte, 0, 10)
+	var c, c1 byte
 	for {
-		c := p.lexer.Raw()
+	whitespace:
+		c = p.lexer.raw()
 		if c == ':' {
 			break
 		}
 		if isWhitespace(c) {
-			continue
+			goto whitespace
+		}
+		if c == '/' {
+			c1 = p.lexer.raw()
+			switch c1 {
+			case '/':
+				for c1 != '\n' {
+					c1 = p.lexer.raw()
+				}
+				goto whitespace
+			case '*':
+				c1 = p.lexer.raw()
+				for {
+					if c1 == '*' {
+						c1 = p.lexer.raw()
+						if c1 == '/' {
+							break
+						}
+					}
+				}
+				goto whitespace
+			default:
+				p.lexer.putc(c1)
+			}
 		}
 		typ = append(typ, c)
+	}
+
+	if len(typ) == 0 {
+		err = newCCError(nil, "expected type")
+		return
 	}
 
 	p.lexer.putc(':')
 	p.next()
 
+	// Check type table to intern the ast.Expr
+	typestr := string(typ[:])
+	if etype, ok := cc.types.lookup(typestr); ok {
+		n = &Node{
+			op:    OTYPE,
+			typ:   typestr,
+			etype: etype,
+		}
+		return
+	}
+
+	var etype ast.Expr
+	if etype, err = parser.ParseExpr(typestr); err != nil {
+		err = newCCError(nil, "invalid type declaration %s", typestr)
+		return
+	}
+
+	switch etype.(type) {
+	case *ast.ArrayType, *ast.ChanType, *ast.FuncType, *ast.Ident, *ast.InterfaceType, *ast.MapType, *ast.SelectorExpr, *ast.StructType:
+		// TODO : Place holder
+		break
+	default:
+		err = newCCError(nil, "invalid type declaration %s", typestr)
+		return
+	}
+
+	cc.types.insert(typestr, etype)
+
 	n = &Node{
-		op:   OTYPE,
-		code: typ,
+		op:    OTYPE,
+		typ:   typestr,
+		etype: etype,
 	}
 
 	return
 }
 
+// TODO : Refactor the RuleHead/RegDef Head, can move declare
 func (p *Parser) parseRuleHead() (n *Node, err error) {
 	s, err := p.parseTermName()
 	if err != nil {
@@ -509,10 +584,11 @@ func (p *Parser) parseRule() (n *Node, err error) {
 	if p.lh.kind == '=' {
 		// TODO : Somewhat hacky to lex/parse right now, clean up
 		// later
-		p.check('=') 
-		p.lexer.Raw()
-		n.ntype, err = p.parseType()
-		if err != nil {
+		lpos := p.lh.pos
+		p.check('=')
+		p.lexer.raw()
+		if n.ntype, err = p.parseType(); err != nil {
+			err = cc.reerror(lpos, err.(*CCError))
 			return
 		}
 	}
