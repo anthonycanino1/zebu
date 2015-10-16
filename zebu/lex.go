@@ -139,7 +139,7 @@ type Lexer struct {
 	ch1 byte
 }
 
-func NewLexer(fileName string) (l *Lexer, err error) {
+func newLexer(fileName string) (l *Lexer, err error) {
 	var file *os.File = nil
 	var buf *bufio.Reader = nil
 

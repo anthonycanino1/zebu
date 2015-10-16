@@ -7,8 +7,8 @@ package zebu
 import (
 	"flag"
 	"fmt"
-	"sort"
 	"go/ast"
+	"sort"
 )
 
 type Strlit struct {
@@ -22,45 +22,38 @@ func (s *Strlit) String() string {
 	return s.lit
 }
 
-type StrlitTab struct {
-	table map[string]*Strlit
-}
+type StrlitTab map[string]*Strlit
 
-func newStrlitTab() (t *StrlitTab) {
-	t = &StrlitTab{
-		table: make(map[string]*Strlit),
-	}
-
+func newStrlitTab() (t StrlitTab) {
+	t = make(map[string]*Strlit)
 	return
 }
 
-// TODO : Might want to move this from a global function to operate
-// directly on the Compiler type
-func (t *StrlitTab) lookup(s string) *Strlit {
+func (t StrlitTab) lookup(s string) *Strlit {
 	return t.lookupGrammar(s, cc.localGrammar)
 }
 
-func (t *StrlitTab) lookupGrammar(s string, g *Grammar) (lit *Strlit) {
-	for h := t.table[s]; h != nil; h = h.link {
+func (t StrlitTab) lookupGrammar(s string, g *Grammar) (lit *Strlit) {
+	for h := t[s]; h != nil; h = h.link {
 		if h.lit == s && h.gram == g {
 			return h
 		}
 	}
 
-	h := t.table[s]
+	h := t[s]
 	lit = &Strlit{
 		lit:  s,
 		link: h,
 		gram: g,
 	}
-	t.table[s] = lit
+	t[s] = lit
 
 	return
 }
 
-func (t *StrlitTab) dump() {
+func (t StrlitTab) dump() {
 	fmt.Printf("----Table----")
-	for _, v := range t.table {
+	for _, v := range t {
 		for s := v; s != nil; s = s.link {
 			fmt.Printf("%s\n", s)
 		}
@@ -98,30 +91,25 @@ var syms = []struct {
 	{"parser", PARSER},
 }
 
-type SymTab struct {
-	table map[string]*Sym
-}
+type SymTab map[string]*Sym
 
-func newSymTab() (t *SymTab) {
-	t = &SymTab{
-		table: make(map[string]*Sym),
-	}
-
+func newSymTab() (t SymTab) {
+	t = make(map[string]*Sym)
 	return
 }
 
-func (t *SymTab) lookup(s string) *Sym {
+func (t SymTab) lookup(s string) *Sym {
 	return t.lookupGrammar(s, cc.localGrammar)
 }
 
-func (t *SymTab) lookupGrammar(s string, g *Grammar) (sym *Sym) {
-	for h := t.table[s]; h != nil; h = h.link {
+func (t SymTab) lookupGrammar(s string, g *Grammar) (sym *Sym) {
+	for h := t[s]; h != nil; h = h.link {
 		if h.name == s && h.gram == g {
 			return h
 		}
 	}
 
-	h := t.table[s]
+	h := t[s]
 	sym = &Sym{
 		name:    s,
 		pos:     nil,
@@ -129,39 +117,33 @@ func (t *SymTab) lookupGrammar(s string, g *Grammar) (sym *Sym) {
 		gram:    g,
 		lexical: NAME, // this get's refined
 	}
-	t.table[s] = sym
+	t[s] = sym
 
 	return
 }
 
-func (t *SymTab) dump() {
+func (t SymTab) dump() {
 	fmt.Printf("----Table----")
-	for _, v := range t.table {
+	for _, v := range t {
 		for s := v; s != nil; s = s.link {
 			fmt.Printf("%s:%d", s, s.lexical)
 		}
 	}
 }
 
-// TODO : Not sure I want this as a named type, but will leave it for now
-type TypeTab struct {
-	table map[string]ast.Expr
-}
+type TypeTab map[string]ast.Expr
 
-func (t *TypeTab) lookup(s string) (e ast.Expr, ok bool) {
-	e, ok = t.table[s]
+func (t TypeTab) lookup(s string) (e ast.Expr, ok bool) {
+	e, ok = t[s]
 	return
 }
 
-func (t *TypeTab) insert(s string, typ ast.Expr) {
-	t.table[s] = typ
+func (t TypeTab) insert(s string, typ ast.Expr) {
+	t[s] = typ
 }
 
-func newTypeTab() (t *TypeTab) {
-	t = &TypeTab{
-		table: make(map[string]ast.Expr),
-	}
-
+func newTypeTab() (t TypeTab) {
+	t = make(map[string]ast.Expr)
 	return
 }
 
@@ -184,13 +166,11 @@ type Compiler struct {
 	parser *Parser
 
 	localGrammar *Grammar
-	symbols      *SymTab
-	types        *TypeTab
-	strlits      *StrlitTab
+	symbols      SymTab
+	types        TypeTab
+	strlits      StrlitTab
 	varids       []*Sym
 	opt          [256]bool
-
-	unionval map[string]string
 
 	errors       []*CCError
 	numSavedErrs int
@@ -211,7 +191,7 @@ func (ce *CCError) Error() string {
 	return ce.msg
 }
 
-func newCCError(p *Position, msg string, args ...interface{}) (*CCError) {
+func newCCError(p *Position, msg string, args ...interface{}) *CCError {
 	return &CCError{
 		pos: p,
 		msg: fmt.Sprintf(msg, args...),
@@ -246,7 +226,7 @@ func (c *Compiler) error(p *Position, msg string, args ...interface{}) (ce *CCEr
 }
 
 func (c *Compiler) reerror(p *Position, re *CCError) (ce *CCError) {
-	ce = &CCError {
+	ce = &CCError{
 		pos: p,
 		msg: re.msg,
 	}
@@ -273,11 +253,10 @@ func init() {
 		types:        newTypeTab(),
 		strlits:      newStrlitTab(),
 		errors:       make([]*CCError, 0, 10),
-		parser:       NewParser(),
+		parser:       newParser(),
 		first:        make(map[*Node]map[*Node]bool),
 		follow:       make(map[*Node]map[*Node]bool),
 		varids:       make([]*Sym, 0, 0),
-		unionval:     make(map[string]string),
 	}
 
 	flag.BoolVar(&cc.opt['h'], "h", false, "print this help message")

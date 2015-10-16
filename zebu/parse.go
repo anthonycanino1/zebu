@@ -14,7 +14,7 @@ type Parser struct {
 	lh    *Token
 }
 
-func NewParser() (p *Parser) {
+func newParser() (p *Parser) {
 	p = &Parser{
 		lexer: nil,
 		lh:    nil,
@@ -661,7 +661,7 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 func (p *Parser) parse(f string) (n *Node) {
 	// 1. Create a lexer to scan the file.
 	var err error
-	p.lexer, err = NewLexer(f)
+	p.lexer, err = newLexer(f)
 	if err != nil {
 		panic("could not open file")
 	}
