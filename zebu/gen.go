@@ -124,18 +124,31 @@ func codeGen(top *Node) {
 
 func codeDump(top *Node) {
 	topDump(top)
-	lexDump(top)
+	lexerDump(top)
+	parserDump(top)
 }
 
+var imports = []string{"bufio", "fmt", "os"}
+
 func topDump(top *Node) {
+	// 1. Dump supplied code
 	if len(top.code) != 0 {
 		fmt.Fprintf(codeout, "%s\n", string(top.code[:]))
 	}
 	fmt.Fprintf(codeout, "\n")
+
+	// 2. Add imports required by our generated cod3
+	fmt.Fprintf(codeout, "import (\n")
+	for _, v := range imports {
+		fmt.Fprintf(codeout, "\"%s\"\n", v)
+	}
+	fmt.Fprintf(codeout, ")\n")
+	fmt.Fprintf(codeout, "\n")
 }
 
-func lexDump(top *Node) {
-	/* 1. lex types */
+func lexerDump(top *Node) {
+	// 1. Lexer types 
+	fmt.Fprintf(codeout, "// Lexing\n")
 	fmt.Fprintf(codeout, "type ZbTokenKind int\n")
 
 	fmt.Fprintf(codeout, "const (\n")
@@ -156,11 +169,108 @@ func lexDump(top *Node) {
 	fmt.Fprintf(codeout, "kind ZbTokenKind\n")
 	fmt.Fprintf(codeout, "val interface{}\n")
 	fmt.Fprintf(codeout, "}\n")
+
+	fmt.Fprintf(codeout, "type ZbLexer struct {\n")
+	fmt.Fprintf(codeout, "buf *bufio.Reader\n")
+	fmt.Fprintf(codeout, "}\n")
+	fmt.Fprintf(codeout, "\n")
+
+	// 2. Lexer code 
+	fmt.Fprintf(codeout, "func consZbLexer(buf *bufio.Reader) *ZbLexer {\n")
+	fmt.Fprintf(codeout, "return &ZbLexer {\n")
+	fmt.Fprintf(codeout, "buf: buf,\n")
+	fmt.Fprintf(codeout, "}\n")
+	fmt.Fprintf(codeout, "}\n")
+	fmt.Fprintf(codeout, "\n")
+
+	fmt.Fprintf(codeout, "func (l *ZbLexer) next() (tok *Token, err error) {\n")
+	fmt.Fprintf(codeout, "return\n")
+	fmt.Fprintf(codeout, "}\n")
+}
+
+func genFriendly(sym *Sym) string {
+	s := ""
+	b := sym.name[0]
+	if b >= 'a' && b <= 'z' {
+		b = 'A' + (b - 'a')
+	}
+	s += string(b)
+	for i := 1; i < len(sym.name); i++ {
+		if (sym.name[i] == '\'') {
+			s += "Prime"
+		} else {
+			s += string(sym.name[i])
+		}
+	}
+	return s
+}
+
+func parserDump(top *Node) {
+	// 1. Parser types 
+	fmt.Fprintf(codeout, "// Parser\n")
+	fmt.Fprintf(codeout, "type ZbParser struct {\n")
+	fmt.Fprintf(codeout, "lexer *ZbLexer\n")
+	fmt.Fprintf(codeout, "lookahead *ZbToken\n")
+	fmt.Fprintf(codeout, "}\n")
+	fmt.Fprintf(codeout, "\n")
+
+	// 2. Parser code
+	fmt.Fprintf(codeout, "func consZbParser(buf *bufio.Reader) *ZbParser {\n")
+	fmt.Fprintf(codeout, "return &ZbParser {\n")
+	fmt.Fprintf(codeout, "lexer: consZbLexer(buf),\n")
+	fmt.Fprintf(codeout, "}\n")
+	fmt.Fprintf(codeout, "}\n")
+	fmt.Fprintf(codeout, "\n")
+
+	fmt.Fprintf(codeout, "func (p *ZbParser) expect(kind TokenKind) error {\n")
+	fmt.Fprintf(codeout, "if p.lookahead != kind {\n")
+	fmt.Fprintf(codeout, "fmt.Printf(\"error!\")\n")
+	fmt.Fprintf(codeout, "os.Exit(1)\n")
+	fmt.Fprintf(codeout, "}\n")
+	fmt.Fprintf(codeout, "p.lookahead = p.lexer.next()\n")
+	fmt.Fprintf(codeout, "return nil\n")
+	fmt.Fprintf(codeout, "}\n")
+	fmt.Fprintf(codeout, "\n")
+
+	// 3. Rule code
+	for _, n := range top.nodes {
+		if (n.op != ORULE) {
+			continue
+		}
+		fmt.Fprintf(codeout, "func (p *ZbParser) parse%s() ", genFriendly(n.sym))
+		if n.ntype != nil {
+			fmt.Fprintf(codeout, "(result %s, err error) {\n", n.ntype.typ)
+		} else {
+			fmt.Fprintf(codeout, "(err error) {\n")
+		}
+		fmt.Fprintf(codeout, "return\n")
+		fmt.Fprintf(codeout, "}\n")
+		fmt.Fprintf(codeout, "\n")
+	}
 }
 
 // Code Generated 
 
 // Lex
-// func Zblex() (tok *Token, err error) { } 
+// type ZbLexer struct {
+//   buf *bufio.Reader
+// }
+// func consZbLexer(buf *bufio.Reader) *ZbLexer { }
+// func (l *ZbLexer) next() (tok *Token, err error) { } 
+
+// Parser
+// type ZbParser struct {
+//   lexer *ZbLexer
+//	 lookahead *ZbToken
+// }
+
+// func consZbParser(buf *bufio.Reader) *ZbParser { }
+// func (p *ZbParser) expect(kind ZbTokenKind) (err error) { 
+//   if p.lookahead != kind {
+//     fmt.Printf("error!")
+//     os.Exit(1)
+//	 }
+//   p.lookahead, _ = p.lexer.next()
+//} 
 
 
