@@ -4,73 +4,14 @@
 package zebu
 
 import (
-	"bufio"
 	"fmt"
-	"io"
-	"os"
-)
-
-type CodeWriter struct {
-	ind    int
-	onlin  bool
-	writer *bufio.Writer
-}
-
-func NewCodeWriter(writer io.Writer) *CodeWriter {
-	return &CodeWriter{
-		ind:    0,
-		onlin:  false,
-		writer: bufio.NewWriter(writer),
-	}
-}
-
-func stdoutCodeWriter() *CodeWriter {
-	return NewCodeWriter(os.Stdout)
-}
-
-func (w *CodeWriter) enter() {
-	w.ind++
-}
-
-func (w *CodeWriter) exit() {
-	w.ind--
-}
-
-func (w *CodeWriter) doInd() {
-	if !w.onlin {
-		for i := 0; i < w.ind; i++ {
-			fmt.Fprintf(w.writer, "  ")
-		}
-		w.onlin = true
-	}
-}
-
-func (w *CodeWriter) write(f string, args ...interface{}) {
-	w.doInd()
-	fmt.Fprintf(w.writer, f, args...)
-}
-
-func (w *CodeWriter) writeln(f string, args ...interface{}) {
-	w.doInd()
-	fmt.Fprintf(w.writer, f, args...)
-	fmt.Fprint(w.writer, "\n")
-	w.onlin = false
-}
-
-func (w *CodeWriter) newline() {
-	fmt.Fprintf(w.writer, "\n")
-	w.onlin = false
-}
-
-func (w *CodeWriter) flush() {
-	w.writer.Flush()
-}
+) 
 
 func pprint(top *Node) {
 	if top.op != OGRAM {
 		panic("pprint should be called on top node\n")
 	}
-	w := stdoutCodeWriter()
+	w := consStdoutCodeWriter()
 
 	w.writeln("grammar %s ;", top.sym)
 	w.newline()
@@ -182,48 +123,44 @@ func codeGen(top *Node) {
 }
 
 func codeDump(top *Node) {
-	w := NewCodeWriter(codeout)
-
-	topDump(top, w)
-	lexDump(top, w)
-
-	w.flush()
+	topDump(top)
+	lexDump(top)
 }
 
-func topDump(top *Node, w *CodeWriter) {
+func topDump(top *Node) {
 	if len(top.code) != 0 {
-		w.writeln(string(top.code[:]))
+		fmt.Fprintf(codeout, "%s\n", string(top.code[:]))
 	}
-	w.newline()
+	fmt.Fprintf(codeout, "\n")
 }
 
-func lexDump(top *Node, w *CodeWriter) {
+func lexDump(top *Node) {
 	/* 1. lex types */
-	w.writeln("type ZbTokenKind int;")
-	w.newline()
+	fmt.Fprintf(codeout, "type ZbTokenKind int\n")
 
-	w.writeln("const (")
-	w.writeln("ZBEOF = iota")
-	w.writeln("ZBUNKNOWN = 0 - iota")
+	fmt.Fprintf(codeout, "const (\n")
+	fmt.Fprintf(codeout, "ZBEOF = iota\n")
+	fmt.Fprintf(codeout, "ZBUNKNOWN = 0 - iota\n")
 	// TODO : We will table this for use later
 	for _, n := range top.nodes {
 		if (n.op != OREGDEF) {
 			continue
 		}
-		w.writeln("ZB%s", n.sym)
+		fmt.Fprintf(codeout, "ZB%s\n", n.sym)
 	}
-	w.writeln(")")
-	w.newline()
+	fmt.Fprintf(codeout, ")\n")
+	fmt.Fprintf(codeout, "\n")
 
-	w.writeln("type ZbToken struct {")
-	w.writeln("pos int")
-	w.writeln("kind ZbTokenKind")
-	w.writeln("val interface{}")
-	w.writeln("}")
-
-
-
+	fmt.Fprintf(codeout, "type ZbToken struct {\n")
+	fmt.Fprintf(codeout, "pos int\n")
+	fmt.Fprintf(codeout, "kind ZbTokenKind\n")
+	fmt.Fprintf(codeout, "val interface{}\n")
+	fmt.Fprintf(codeout, "}\n")
 }
 
-/* Code Generated */
+// Code Generated 
+
+// Lex
+// func Zblex() (tok *Token, err error) { } 
+
 

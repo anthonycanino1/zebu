@@ -10,6 +10,7 @@ import (
 	"go/ast"
 	"go/format"
 	"io/ioutil"
+	"bufio"
 	"os"
 	"sort"
 )
@@ -183,7 +184,7 @@ var first map[*Node]map[*Node]bool
 var follow map[*Node]map[*Node]bool
 
 var outflag string
-var codeout *os.File
+var codeout *bufio.Writer
 
 type CCError struct {
 	pos *Position
@@ -390,6 +391,16 @@ func gofmt() {
 	ioutil.WriteFile(outflag, src, 0666)
 }
 
+func exit(status int) {
+	flushErrors()
+	if codeout != nil {
+		codeout.Flush()
+		codeout = nil
+		gofmt()
+	}
+	os.Exit(status)
+}
+
 func Main() {
 	flag.Parse()
 	args := flag.Args()
@@ -402,26 +413,25 @@ func Main() {
 	if outflag == "" {
 		outflag = "zb.go"
 	}
-	codeout, _ = os.Create(outflag)
-	if codeout == nil {
+	file, _ := os.Create(outflag)
+	if file == nil {
 		fmt.Printf("failed to created file %s\n", outflag)
-		return
+		exit(1)
 	}
+	codeout = bufio.NewWriter(file)
 
 	// Pass #1: Parse grammar (dependencies must be in include path)
 	name := args[0]
 	top := zbparser.parse(name)
 	if numTotalErrs > 0 {
-		flushErrors()
-		return
+		exit(1)
 	}
 
 	// Pass #1.5: Resolve symbols (this resolution should be pushed
 	// into Pass #2 in the future to amortize the cost).
 	top = resolveSymbols(top)
 	if numTotalErrs > 0 {
-		flushErrors()
-		return
+		exit(1)
 	}
 
 	if opt['d'] {
@@ -432,8 +442,7 @@ func Main() {
 	typeCheck(top)
 
 	if numTotalErrs > 0 {
-		flushErrors()
-		return
+		exit(1)
 	}
 
 	// Pass #3: Generate code in memory for the generated compiler. At this point
@@ -443,10 +452,9 @@ func Main() {
 
 	// Pass #4: Dump out the generated code
 	codeDump(top)
-	codeout.Close()
 
 	// Clean up with gofmt
 	gofmt()
 
-	return
+	exit(0)
 }

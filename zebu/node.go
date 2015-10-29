@@ -188,7 +188,7 @@ func escapeStrlit(s string) string {
 }
 
 func (n *Node) dumpTree() {
-	w := stdoutCodeWriter()
+	w := consStdoutCodeWriter()
 	walkdump(n, w)
 	w.flush()
 }
