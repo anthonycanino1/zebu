@@ -11,10 +11,10 @@ var _ = fmt.Printf
 
 func primeName(name string) string {
 	namep := name
-	s := cc.symbols.lookup(namep)
+	s := symbols.lookup(namep)
 	for s.defn != nil {
 		namep = fmt.Sprintf("%s'", namep)
-		s = cc.symbols.lookup(namep)
+		s = symbols.lookup(namep)
 	}
 	return namep
 }
@@ -144,7 +144,7 @@ func buildFirst(top *Node) {
 		if dcl.op != ORULE {
 			continue
 		}
-		cc.first[dcl] = make(map[*Node]bool)
+		first[dcl] = make(map[*Node]bool)
 	}
 
 	anotherPass := true
@@ -162,26 +162,26 @@ func buildFirst(top *Node) {
 					e := elem.left
 					switch e.op {
 					case OEPSILON:
-						if !cc.first[dcl][e] {
-							cc.first[dcl][e] = true
+						if !first[dcl][e] {
+							first[dcl][e] = true
 							anotherPass = true
 						}
 
 					case OREGDEF, OSTRLIT:
-						if !cc.first[dcl][e] {
-							cc.first[dcl][e] = true
+						if !first[dcl][e] {
+							first[dcl][e] = true
 							anotherPass = true
 						}
 						continue productions
 
 					case ORULE:
-						for k, _ := range cc.first[e] {
-							if !cc.first[dcl][k] {
-								cc.first[dcl][k] = true
+						for k, _ := range first[e] {
+							if !first[dcl][k] {
+								first[dcl][k] = true
 								anotherPass = true
 							}
 						}
-						if !cc.first[e][nepsilon] {
+						if !first[e][nepsilon] {
 							continue productions
 						}
 
@@ -189,8 +189,8 @@ func buildFirst(top *Node) {
 						panic(fmt.Sprintf("unexpected op %s while building first", e.op))
 					}
 				}
-				if !cc.first[dcl][nepsilon] {
-					cc.first[dcl][nepsilon] = true
+				if !first[dcl][nepsilon] {
+					first[dcl][nepsilon] = true
 					anotherPass = true
 				}
 			}
@@ -209,7 +209,7 @@ func buildFollow(top *Node) {
 		if dcl.op != ORULE {
 			continue
 		}
-		cc.follow[dcl] = make(map[*Node]bool)
+		follow[dcl] = make(map[*Node]bool)
 	}
 
 	anotherPass := true
@@ -236,17 +236,17 @@ func buildFollow(top *Node) {
 					if next != nil {
 						switch next.op {
 						case OREGDEF, OSTRLIT:
-							if !cc.follow[e][next] {
-								cc.follow[e][next] = true
+							if !follow[e][next] {
+								follow[e][next] = true
 								anotherPass = true
 							}
 						case ORULE:
-							for k, _ := range cc.first[next] {
+							for k, _ := range first[next] {
 								if k == nepsilon {
 									continue
 								}
-								if !cc.follow[e][k] {
-									cc.follow[e][k] = true
+								if !follow[e][k] {
+									follow[e][k] = true
 									anotherPass = true
 								}
 							}
@@ -256,10 +256,10 @@ func buildFollow(top *Node) {
 						}
 					}
 
-					if next == nil || next.op == OEPSILON || (next.op == ORULE && cc.first[next][nepsilon]) {
-						for k, _ := range cc.follow[dcl] {
-							if !cc.follow[e][k] {
-								cc.follow[e][k] = true
+					if next == nil || next.op == OEPSILON || (next.op == ORULE && first[next][nepsilon]) {
+						for k, _ := range follow[dcl] {
+							if !follow[e][k] {
+								follow[e][k] = true
 								anotherPass = true
 							}
 						}
@@ -302,11 +302,11 @@ func printSet(top *Node, name string, set *map[*Node]map[*Node]bool) {
 }
 
 func printFirst(top *Node) {
-	printSet(top, "First", &cc.first)
+	printSet(top, "First", &first)
 }
 
 func printFollow(top *Node) {
-	printSet(top, "Follow", &cc.follow)
+	printSet(top, "Follow", &follow)
 }
 
 func ll1Check(top *Node) {
@@ -326,20 +326,20 @@ func ll1Check(top *Node) {
 			case OSTRLIT, OREGDEF:
 				if disjoint[fst] {
 					if (dcl.orig != nil) {
-						cc.error(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
+						compileError(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
 					} else {
-						cc.error(dcl.pos, "%s is ambiguous", dcl.sym)
+						compileError(dcl.pos, "%s is ambiguous", dcl.sym)
 					}
 				}
 				disjoint[fst] = true
 			case OEPSILON:
 				if followNotAdded {
-					for k, _ := range cc.follow[dcl] {
+					for k, _ := range follow[dcl] {
 						if disjoint[k] {
 							if (dcl.orig != nil) {
-								cc.error(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
+								compileError(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
 							} else {
-								cc.error(dcl.pos, "%s is ambiguous", dcl.sym)
+								compileError(dcl.pos, "%s is ambiguous", dcl.sym)
 							}
 						}
 						disjoint[k] = true
@@ -347,14 +347,14 @@ func ll1Check(top *Node) {
 					followNotAdded = false
 				}
 			case ORULE:
-				if cc.first[fst][nepsilon] && followNotAdded {
+				if first[fst][nepsilon] && followNotAdded {
 					// Use follow[dcl]
-					for k, _ := range cc.follow[dcl] {
+					for k, _ := range follow[dcl] {
 						if disjoint[k] {
 							if (dcl.orig != nil) {
-								cc.error(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
+								compileError(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
 							} else {
-								cc.error(dcl.pos, "%s is ambiguous", dcl.sym)
+								compileError(dcl.pos, "%s is ambiguous", dcl.sym)
 							}
 						}
 						disjoint[k] = true
@@ -362,12 +362,12 @@ func ll1Check(top *Node) {
 					followNotAdded = false
 				} else {
 					// Use first[fst]
-					for k, _ := range cc.first[fst] {
+					for k, _ := range first[fst] {
 						if disjoint[k] {
 							if (dcl.orig != nil) {
-								cc.error(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
+								compileError(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
 							} else {
-								cc.error(dcl.pos, "%s is ambiguous", dcl.sym)
+								compileError(dcl.pos, "%s is ambiguous", dcl.sym)
 							}
 						}
 						disjoint[k] = true
@@ -388,7 +388,7 @@ func typeCheck(top *Node) {
 	removeDirectRecursion(top)
 	//removeIndirectRecursion(top)
 
-	if cc.opt['t'] {
+	if opt['t'] {
 		pprint(top)
 	}
 
@@ -397,7 +397,7 @@ func typeCheck(top *Node) {
 	buildFirst(top)
 	buildFollow(top)
 
-	if cc.opt['g'] {
+	if opt['g'] {
 		printFirst(top)
 		printFollow(top)
 	}

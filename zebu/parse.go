@@ -38,7 +38,7 @@ func (p *Parser) check(k TokenKind) bool {
 func (p *Parser) match(k TokenKind) (t *Token, err error) {
 	if t = p.next(); t.kind != k {
 		t = nil
-		err = cc.error(p.lh.pos, "expected %s", k)
+		err = compileError(p.lh.pos, "expected %s", k)
 	}
 	return
 }
@@ -69,14 +69,14 @@ func (p *Parser) parseChar() (n *Node, err error) {
 			return
 		}
 		if s.defn == nil {
-			err = cc.error(p.lh.pos, "undeclared regular definition!")
+			err = compileError(p.lh.pos, "undeclared regular definition!")
 			return
 		}
 		n = s.defn
 	case STRLIT:
 		n, err = p.parseStrlit()
 	default:
-		err = cc.error(p.lh.pos, "expected regular definition or string literal, found %s", p.lh)
+		err = compileError(p.lh.pos, "expected regular definition or string literal, found %s", p.lh)
 		return
 	}
 	return
@@ -316,7 +316,7 @@ func (p *Parser) parseRegdef() (n *Node, err error) {
 		p.check('=')
 		p.lexer.raw()
 		if n.ntype, err = p.parseType(); err != nil {
-			err = cc.reerror(lpos, err.(*CCError))
+			err = reerror(lpos, err.(*CCError))
 			return
 		}
 	}
@@ -417,7 +417,7 @@ func (p *Parser) parseProdElem() (n *Node, err error) {
 	case '|', '{', ';':
 		nn, err = p.parseEpsilon()
 	default:
-		err = cc.error(p.lh.pos, "unexpected %s.", p.lh)
+		err = compileError(p.lh.pos, "unexpected %s.", p.lh)
 	}
 	if err != nil {
 		return
@@ -529,7 +529,7 @@ func (p *Parser) parseType() (n *Node, err error) {
 
 	// Check type table to intern the ast.Expr
 	typestr := string(typ[:])
-	if etype, ok := cc.types.lookup(typestr); ok {
+	if etype, ok := types.lookup(typestr); ok {
 		n = &Node{
 			op:    OTYPE,
 			typ:   typestr,
@@ -553,7 +553,7 @@ func (p *Parser) parseType() (n *Node, err error) {
 		return
 	}
 
-	cc.types.insert(typestr, etype)
+	types.insert(typestr, etype)
 
 	n = &Node{
 		op:    OTYPE,
@@ -588,7 +588,7 @@ func (p *Parser) parseRule() (n *Node, err error) {
 		p.check('=')
 		p.lexer.raw()
 		if n.ntype, err = p.parseType(); err != nil {
-			err = cc.reerror(lpos, err.(*CCError))
+			err = reerror(lpos, err.(*CCError))
 			return
 		}
 	}
@@ -610,7 +610,7 @@ func (p *Parser) parseDecl() (n *Node, err error) {
 	case NONTERMINAL:
 		n, err = p.parseRegdef()
 	default:
-		err = cc.error(p.lh.pos, "expected terminal or nonterminal declaration, found %s", p.lh)
+		err = compileError(p.lh.pos, "expected terminal or nonterminal declaration, found %s", p.lh)
 	}
 
 	// error recovery, simply skip to the next semicolon (the end of a declaration)
@@ -622,6 +622,27 @@ func (p *Parser) parseDecl() (n *Node, err error) {
 
 	p.match(';')
 
+	return
+}
+
+func (p *Parser) parseEscapeCode() (code []byte, err error) {
+	if !p.check(ESCOPEN) {
+		return
+	}
+	p.lexer.raw()
+	for {
+		c := p.lexer.raw()
+		if c == '@' {
+			c2 := p.lexer.raw()
+			if (c2 == '}') {
+				break
+			}
+			p.lexer.putc(c2)
+		}
+		code = append(code, c)
+	}
+	// reset the lh token
+	p.next()
 	return
 }
 
@@ -641,6 +662,12 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 	declare(n)
 
 	p.match(';')
+
+	if p.lh.kind == ESCOPEN {
+		if n.code, err = p.parseEscapeCode(); err != nil {
+			return
+		} 
+	}
 
 	for p.lh.kind != EOF {
 		var n2 *Node
@@ -665,7 +692,7 @@ func (p *Parser) parse(f string) (n *Node) {
 	if err != nil {
 		panic("could not open file")
 	}
-	cc.numSavedErrs = 0
+	numSavedErrs = 0
 	p.lh = p.lexer.Next()
 
 	// 2. Parse the file, exiting if any errors were encountered
@@ -675,7 +702,7 @@ func (p *Parser) parse(f string) (n *Node) {
 
 	// 3. Check to make sure we have a start rule
 	if n.left == nil {
-		cc.error(n.pos, "grammar must define a start rule.")
+		compileError(n.pos, "grammar must define a start rule.")
 	}
 
 	return

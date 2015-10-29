@@ -139,7 +139,7 @@ func nodeRuleFromFactoring(dcl *Node, remain [][]*Node) (rule *Node) {
 	}
 
 	rname := primeName(dcl.sym.name)
-	s := cc.symbols.lookup(rname)
+	s := symbols.lookup(rname)
 	rule = &Node{
 		op:    ORULE,
 		sym:   s,
@@ -152,7 +152,7 @@ func nodeRuleFromFactoring(dcl *Node, remain [][]*Node) (rule *Node) {
 
 func nodeRuleFromLeftRecursion(dcl *Node, prod *Node) (rule *Node) {
 	rname := primeName(dcl.sym.name)
-	s := cc.symbols.lookup(rname)
+	s := symbols.lookup(rname)
 	rule = &Node{
 		op:   ORULE,
 		sym:  s,

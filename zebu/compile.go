@@ -8,6 +8,9 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/format"
+	"io/ioutil"
+	"os"
 	"sort"
 )
 
@@ -30,7 +33,7 @@ func newStrlitTab() (t StrlitTab) {
 }
 
 func (t StrlitTab) lookup(s string) *Strlit {
-	return t.lookupGrammar(s, cc.localGrammar)
+	return t.lookupGrammar(s, localGrammar)
 }
 
 func (t StrlitTab) lookupGrammar(s string, g *Grammar) (lit *Strlit) {
@@ -99,7 +102,7 @@ func newSymTab() (t SymTab) {
 }
 
 func (t SymTab) lookup(s string) *Sym {
-	return t.lookupGrammar(s, cc.localGrammar)
+	return t.lookupGrammar(s, localGrammar)
 }
 
 func (t SymTab) lookupGrammar(s string, g *Grammar) (sym *Sym) {
@@ -162,25 +165,25 @@ func (g *Grammar) String() string {
 	return g.name
 }
 
-type Compiler struct {
-	parser *Parser
+// Compiler globals
+var zbparser *Parser
+var localGrammar *Grammar
+var symbols SymTab
+var types TypeTab
+var strlits StrlitTab
+var varids []*Sym
+var opt [256]bool
 
-	localGrammar *Grammar
-	symbols      SymTab
-	types        TypeTab
-	strlits      StrlitTab
-	varids       []*Sym
-	opt          [256]bool
+var errors []*CCError
+var numSavedErrs int
+var numTotalErrs int
 
-	errors       []*CCError
-	numSavedErrs int
-	numTotalErrs int
+var zbpos *Position
+var first map[*Node]map[*Node]bool
+var follow map[*Node]map[*Node]bool
 
-	pos *Position
-
-	first  map[*Node]map[*Node]bool
-	follow map[*Node]map[*Node]bool
-}
+var outflag string
+var codeout *os.File
 
 type CCError struct {
 	pos *Position
@@ -217,56 +220,53 @@ func (a CCErrorByPos) Less(i, j int) bool {
 	return ie.line < je.line
 }
 
-func (c *Compiler) error(p *Position, msg string, args ...interface{}) (ce *CCError) {
+func compileError(p *Position, msg string, args ...interface{}) (ce *CCError) {
 	ce = newCCError(p, msg, args...)
-	c.errors = append(c.errors, ce)
-	c.numSavedErrs++
-	c.numTotalErrs++
+	errors = append(errors, ce)
+	numSavedErrs++
+	numTotalErrs++
 	return
 }
 
-func (c *Compiler) reerror(p *Position, re *CCError) (ce *CCError) {
+func reerror(p *Position, re *CCError) (ce *CCError) {
 	ce = &CCError{
 		pos: p,
 		msg: re.msg,
 	}
-	c.errors = append(c.errors, ce)
-	c.numSavedErrs++
-	c.numTotalErrs++
+	errors = append(errors, ce)
+	numSavedErrs++
+	numTotalErrs++
 	return
 }
 
-func (c *Compiler) flushErrors() {
-	sort.Sort(CCErrorByPos(c.errors))
-	for i := 0; i < len(c.errors); i++ {
-		fmt.Printf("%s: %s\n", c.errors[i].pos, c.errors[i].msg)
+func flushErrors() {
+	sort.Sort(CCErrorByPos(errors))
+	for i := 0; i < len(errors); i++ {
+		fmt.Printf("%s: %s\n", errors[i].pos, errors[i].msg)
 	}
 }
 
-var cc *Compiler = nil
-
 func init() {
-	localGrammar := NewGrammar("_")
-	cc = &Compiler{
-		localGrammar: localGrammar,
-		symbols:      newSymTab(),
-		types:        newTypeTab(),
-		strlits:      newStrlitTab(),
-		errors:       make([]*CCError, 0, 10),
-		parser:       newParser(),
-		first:        make(map[*Node]map[*Node]bool),
-		follow:       make(map[*Node]map[*Node]bool),
-		varids:       make([]*Sym, 0, 0),
-	}
+	localGrammar = NewGrammar("_")
+	symbols = newSymTab()
+	types = newTypeTab()
+	strlits = newStrlitTab()
+	errors = make([]*CCError, 0, 10)
+	zbparser = newParser()
+	first = make(map[*Node]map[*Node]bool)
+	follow = make(map[*Node]map[*Node]bool)
+	varids = make([]*Sym, 0, 0)
 
-	flag.BoolVar(&cc.opt['h'], "h", false, "print this help message")
-	flag.BoolVar(&cc.opt['d'], "d", false, "dump the AST after parsing")
-	flag.BoolVar(&cc.opt['t'], "t", false, "dump the AST after transformation")
-	flag.BoolVar(&cc.opt['g'], "g", false, "print semantic information about grammar construction")
+	flag.BoolVar(&opt['h'], "h", false, "print this help message")
+	flag.BoolVar(&opt['d'], "d", false, "dump the AST after parsing")
+	flag.BoolVar(&opt['t'], "t", false, "dump the AST after transformation")
+	flag.BoolVar(&opt['g'], "g", false, "print semantic information about grammar construction")
+	flag.BoolVar(&opt['n'], "n", false, "skip dump of generated output")
+	flag.StringVar(&outflag, "o", "", "generated output file")
 
 	// Populate symbol table with known symbols
 	for i := 0; i < len(syms); i++ {
-		s := cc.symbols.lookup(syms[i].name)
+		s := symbols.lookup(syms[i].name)
 		s.lexical = syms[i].kind
 	}
 }
@@ -306,7 +306,7 @@ func oldname(s *Sym) (n *Node) {
 func declare(n *Node) {
 	s := n.sym
 	if s.defn != nil && s.defn.op != ONONAME {
-		cc.error(s.pos, "%s previously defined at %s.", s, s.defn.pos)
+		compileError(s.pos, "%s previously defined at %s.", s, s.defn.pos)
 		return
 	}
 	s.defn = n
@@ -320,9 +320,9 @@ func resolve(n *Node) *Node {
 	s := n.sym
 	if s.defn == nil || s.defn.op == ONONAME {
 		if s.lexical == TERMINAL {
-			cc.error(s.pos, "unresolved terminal symbol %s.", s)
+			compileError(s.pos, "unresolved terminal symbol %s.", s)
 		} else {
-			cc.error(s.pos, "unresolved nonterminal symbol %s.", s)
+			compileError(s.pos, "unresolved nonterminal symbol %s.", s)
 		}
 		return nil
 	}
@@ -330,15 +330,15 @@ func resolve(n *Node) *Node {
 }
 
 func pushvarid(s *Sym) (err error) {
-	cc.varids = append(cc.varids, s)
+	varids = append(varids, s)
 	return
 }
 
 func popvarids() {
-	for _, s := range cc.varids {
+	for _, s := range varids {
 		s.defn = nil
 	}
-	cc.varids = cc.varids[:0]
+	varids = varids[:0]
 }
 
 // This is for development purpose only, to take my mind off resolution
@@ -346,7 +346,7 @@ func popvarids() {
 // O(n) in the size of the AST, which can be done inside one of the
 // other O(n) passes.
 func resolveSymbols(n *Node) *Node {
-	cc.numSavedErrs = 0
+	numSavedErrs = 0
 	return walkResolve(n)
 }
 
@@ -378,40 +378,61 @@ func walkResolve(n *Node) *Node {
 	return n
 }
 
+func gofmt() {
+	src, err := ioutil.ReadFile(outflag)
+	if err != nil {
+		return
+	}
+	src, err = format.Source(src)
+	if err != nil {
+		return
+	}
+	ioutil.WriteFile(outflag, src, 0666)
+}
+
 func Main() {
 	flag.Parse()
 	args := flag.Args()
 
-	if cc.opt['h'] || len(args) == 0 {
+	if opt['h'] || len(args) == 0 {
 		flag.Usage()
+		return
+	}
+
+	if outflag == "" {
+		outflag = "zb.go"
+	}
+	codeout, _ = os.Create(outflag)
+	if codeout == nil {
+		fmt.Printf("failed to created file %s\n", outflag)
 		return
 	}
 
 	// Pass #1: Parse grammar (dependencies must be in include path)
 	name := args[0]
-	top := cc.parser.parse(name)
-	if cc.numTotalErrs > 0 {
-		cc.flushErrors()
+	top := zbparser.parse(name)
+	if numTotalErrs > 0 {
+		flushErrors()
 		return
 	}
 
 	// Pass #1.5: Resolve symbols (this resolution should be pushed
 	// into Pass #2 in the future to amortize the cost).
 	top = resolveSymbols(top)
-	if cc.numTotalErrs > 0 {
-		cc.flushErrors()
+	if numTotalErrs > 0 {
+		flushErrors()
 		return
 	}
 
-	if cc.opt['d'] {
+	if opt['d'] {
 		top.dumpTree()
 	}
 
 	// Pass #2: Type check and transform the tree into a valid LL(1) grammar.
 	typeCheck(top)
 
-	if cc.numTotalErrs > 0 {
-		cc.flushErrors()
+	if numTotalErrs > 0 {
+		flushErrors()
 		return
 	}
 
@@ -422,6 +443,10 @@ func Main() {
 
 	// Pass #4: Dump out the generated code
 	codeDump(top)
+	codeout.Close()
+
+	// Clean up with gofmt
+	gofmt()
 
 	return
 }

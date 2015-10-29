@@ -35,6 +35,10 @@ const (
 	MODIFY
 	LEXER
 	PARSER
+
+	// Escape tokens
+	ESCOPEN
+	ESCCLOSE
 )
 
 var tokenLabels = map[TokenKind]string{
@@ -271,7 +275,7 @@ lex_whitespace:
 		col:  l.col,
 	}
 	// Update compiler position for better diagnostics
-	cc.pos = t.pos
+	zbpos = t.pos
 
 	// Let's keep mode handling as the prefix to all lexing (minus whitespace)
 	// Easier to jump state once mode is handled
@@ -315,6 +319,19 @@ lex_begin:
 	switch l.ch {
 	case '\'':
 		goto lex_strlit
+
+	case '@':
+		l.getc()
+		switch l.ch {
+		case '{':
+			t.kind = ESCOPEN	
+			goto lex_out
+		case '}':
+			t.kind = ESCCLOSE
+			goto lex_out
+		default:
+			l.putc(l.ch)
+		} 
 
 	case '/':
 		l.getc()
@@ -365,7 +382,7 @@ lex_alpha:
 		lxbuf[cp] = l.ch
 		cp++
 	}
-	t.sym = cc.symbols.lookup(string(lxbuf[:cp]))
+	t.sym = symbols.lookup(string(lxbuf[:cp]))
 	t.kind = t.sym.lexical
 	t.sym.pos = t.pos
 	if t.kind == NAME {
@@ -419,7 +436,7 @@ lex_strlit:
 		cp++
 	}
 	t.kind = STRLIT
-	t.lit = cc.strlits.lookup(string(lxbuf[:cp]))
+	t.lit = strlits.lookup(string(lxbuf[:cp]))
 
 	goto lex_out
 

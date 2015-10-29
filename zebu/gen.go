@@ -182,6 +182,48 @@ func codeGen(top *Node) {
 }
 
 func codeDump(top *Node) {
+	w := NewCodeWriter(codeout)
+
+	topDump(top, w)
+	lexDump(top, w)
+
+	w.flush()
 }
 
+func topDump(top *Node, w *CodeWriter) {
+	if len(top.code) != 0 {
+		w.writeln(string(top.code[:]))
+	}
+	w.newline()
+}
+
+func lexDump(top *Node, w *CodeWriter) {
+	/* 1. lex types */
+	w.writeln("type ZbTokenKind int;")
+	w.newline()
+
+	w.writeln("const (")
+	w.writeln("ZBEOF = iota")
+	w.writeln("ZBUNKNOWN = 0 - iota")
+	// TODO : We will table this for use later
+	for _, n := range top.nodes {
+		if (n.op != OREGDEF) {
+			continue
+		}
+		w.writeln("ZB%s", n.sym)
+	}
+	w.writeln(")")
+	w.newline()
+
+	w.writeln("type ZbToken struct {")
+	w.writeln("pos int")
+	w.writeln("kind ZbTokenKind")
+	w.writeln("val interface{}")
+	w.writeln("}")
+
+
+
+}
+
+/* Code Generated */
 
