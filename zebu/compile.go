@@ -27,7 +27,7 @@ func (s *Strlit) String() string {
 
 type StrlitTab map[string]*Strlit
 
-func newStrlitTab() (t StrlitTab) {
+func consStrlitTab() (t StrlitTab) {
 	t = make(map[string]*Strlit)
 	return
 }
@@ -96,7 +96,7 @@ var syms = []struct {
 
 type SymTab map[string]*Sym
 
-func newSymTab() (t SymTab) {
+func consSymTab() (t SymTab) {
 	t = make(map[string]*Sym)
 	return
 }
@@ -145,7 +145,7 @@ func (t TypeTab) insert(s string, typ ast.Expr) {
 	t[s] = typ
 }
 
-func newTypeTab() (t TypeTab) {
+func consTypeTab() (t TypeTab) {
 	t = make(map[string]ast.Expr)
 	return
 }
@@ -154,7 +154,7 @@ type Grammar struct {
 	name string
 }
 
-func NewGrammar(s string) (g *Grammar) {
+func consGrammar(s string) (g *Grammar) {
 	g = &Grammar{
 		name: s,
 	}
@@ -194,7 +194,7 @@ func (ce *CCError) Error() string {
 	return ce.msg
 }
 
-func newCCError(p *Position, msg string, args ...interface{}) *CCError {
+func consCCError(p *Position, msg string, args ...interface{}) *CCError {
 	return &CCError{
 		pos: p,
 		msg: fmt.Sprintf(msg, args...),
@@ -221,7 +221,7 @@ func (a CCErrorByPos) Less(i, j int) bool {
 }
 
 func compileError(p *Position, msg string, args ...interface{}) (ce *CCError) {
-	ce = newCCError(p, msg, args...)
+	ce = consCCError(p, msg, args...)
 	errors = append(errors, ce)
 	numSavedErrs++
 	numTotalErrs++
@@ -247,12 +247,12 @@ func flushErrors() {
 }
 
 func init() {
-	localGrammar = NewGrammar("_")
-	symbols = newSymTab()
-	types = newTypeTab()
-	strlits = newStrlitTab()
+	localGrammar = consGrammar("_")
+	symbols = consSymTab()
+	types = consTypeTab()
+	strlits = consStrlitTab()
 	errors = make([]*CCError, 0, 10)
-	zbparser = newParser()
+	zbparser = consParser()
 	first = make(map[*Node]map[*Node]bool)
 	follow = make(map[*Node]map[*Node]bool)
 	varids = make([]*Sym, 0, 0)

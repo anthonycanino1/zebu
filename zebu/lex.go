@@ -143,7 +143,7 @@ type Lexer struct {
 	ch1 byte
 }
 
-func newLexer(fileName string) (l *Lexer, err error) {
+func consLexer(fileName string) (l *Lexer, err error) {
 	var file *os.File = nil
 	var buf *bufio.Reader = nil
 
@@ -256,7 +256,7 @@ func (l *Lexer) raw() byte {
 	return c
 }
 
-func (l *Lexer) Next() (t *Token) {
+func (l *Lexer) next() (t *Token) {
 	t = new(Token)
 	var cp int
 	var ep int

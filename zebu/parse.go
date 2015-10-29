@@ -14,7 +14,7 @@ type Parser struct {
 	lh    *Token
 }
 
-func newParser() (p *Parser) {
+func consParser() (p *Parser) {
 	p = &Parser{
 		lexer: nil,
 		lh:    nil,
@@ -24,7 +24,7 @@ func newParser() (p *Parser) {
 
 func (p *Parser) next() (t *Token) {
 	t = p.lh
-	p.lh = p.lexer.Next()
+	p.lh = p.lexer.next()
 	return
 }
 
@@ -520,7 +520,7 @@ func (p *Parser) parseType() (n *Node, err error) {
 	}
 
 	if len(typ) == 0 {
-		err = newCCError(nil, "expected type")
+		err = consCCError(nil, "expected type")
 		return
 	}
 
@@ -540,7 +540,7 @@ func (p *Parser) parseType() (n *Node, err error) {
 
 	var etype ast.Expr
 	if etype, err = parser.ParseExpr(typestr); err != nil {
-		err = newCCError(nil, "invalid type declaration %s", typestr)
+		err = consCCError(nil, "invalid type declaration %s", typestr)
 		return
 	}
 
@@ -549,7 +549,7 @@ func (p *Parser) parseType() (n *Node, err error) {
 		// TODO : Place holder
 		break
 	default:
-		err = newCCError(nil, "invalid type declaration %s", typestr)
+		err = consCCError(nil, "invalid type declaration %s", typestr)
 		return
 	}
 
@@ -688,12 +688,12 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 func (p *Parser) parse(f string) (n *Node) {
 	// 1. Create a lexer to scan the file.
 	var err error
-	p.lexer, err = newLexer(f)
+	p.lexer, err = consLexer(f)
 	if err != nil {
 		panic("could not open file")
 	}
 	numSavedErrs = 0
-	p.lh = p.lexer.Next()
+	p.lh = p.lexer.next()
 
 	// 2. Parse the file, exiting if any errors were encountered
 	if n, err = p.parseGrammar(); err != nil {
