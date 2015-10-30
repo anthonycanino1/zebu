@@ -5,12 +5,12 @@
 package zebu
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"go/ast"
 	"go/format"
 	"io/ioutil"
-	"bufio"
 	"os"
 	"sort"
 )
@@ -173,6 +173,7 @@ var symbols SymTab
 var types TypeTab
 var strlits StrlitTab
 var varids []*Sym
+var nextvarid int
 var opt [256]bool
 
 var errors []*CCError
@@ -261,6 +262,7 @@ func init() {
 	flag.BoolVar(&opt['h'], "h", false, "print this help message")
 	flag.BoolVar(&opt['d'], "d", false, "dump the AST after parsing")
 	flag.BoolVar(&opt['t'], "t", false, "dump the AST after transformation")
+	flag.BoolVar(&opt['p'], "p", false, "pretty print the AST after transformation")
 	flag.BoolVar(&opt['g'], "g", false, "print semantic information about grammar construction")
 	flag.BoolVar(&opt['n'], "n", false, "skip dump of generated output")
 	flag.StringVar(&outflag, "o", "", "generated output file")
@@ -332,6 +334,13 @@ func resolve(n *Node) *Node {
 
 func pushvarid(s *Sym) (err error) {
 	varids = append(varids, s)
+	return
+}
+
+func pushnextvarid() (s *Sym) {
+	s = symbols.lookup(fmt.Sprintf("$%d", nextvarid))
+	s.pos = zbpos
+	pushvarid(s)
 	return
 }
 

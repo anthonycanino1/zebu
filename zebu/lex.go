@@ -229,6 +229,10 @@ func isVarId(c byte) bool {
 	return c == '$'
 }
 
+func isVarIdChar(c byte) bool {
+	return c == '$' || isAlphanum(c)
+}
+
 func regEscape(c byte) byte {
 	return c
 }

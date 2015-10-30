@@ -45,6 +45,7 @@ var nodeOpLabels = map[NodeOp]string{
 	OTYPE:     "otype",
 	OACTION:   "oaction",
 	OEPSILON:  "oepsilon",
+	OVARID:    "ovarid",
 }
 
 func (n NodeOp) String() string {
@@ -79,6 +80,9 @@ type Node struct {
 	code  []byte
 	typ   string
 	etype ast.Expr
+
+	// OVARID
+	used bool
 
 	// OREPEAT
 	lb int

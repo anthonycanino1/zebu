@@ -338,16 +338,32 @@ func (p *Parser) parseAction() (n *Node, err error) {
 		return
 	}
 	lvl := 0
-	codebuf := make([]byte, 512)
+	codebuf := make([]byte, 0, 512)
 	for {
 		c := p.lexer.raw()
 		if c == '}' && lvl == 0 {
 			break
 		}
-		if c == '{' {
+		switch c {
+		case '{':
 			lvl++
-		} else if c == '}' {
+		case '}':
 			lvl--
+		case '$':
+			buf := []byte{'$'}
+			for c1 := p.lexer.raw(); isVarIdChar(c1); c1 = p.lexer.raw() {
+				buf = append(buf, c1)
+			}
+			s := symbols.lookup(string(buf))
+			if s.defn == nil {
+				if s.name != "$$" {
+					compileError(zbpos, "undefined variable id %s", s)
+				}
+			} else {
+				s.defn.used = true
+			}
+			codebuf = append(codebuf, buf...)
+			continue
 		}
 		codebuf = append(codebuf, c)
 	}
@@ -432,9 +448,13 @@ func (p *Parser) parseProdElem() (n *Node, err error) {
 		if err != nil {
 			return
 		}
-		n.right.ntype = n
 		pushvarid(n.right.sym)
+	} else {
+		n.right = newname(pushnextvarid())
+		n.right.op = OVARID
+		declare(n.right)
 	}
+	n.right.ntype = n
 	if p.lh.kind == '{' {
 		n.action, err = p.parseAction()
 	}
@@ -443,6 +463,7 @@ func (p *Parser) parseProdElem() (n *Node, err error) {
 
 func (p *Parser) parseProd() (n *Node, err error) {
 	l := make([]*Node, 0)
+	nextvarid = 1
 	defer popvarids()
 	for {
 		var nn *Node
@@ -453,6 +474,7 @@ func (p *Parser) parseProd() (n *Node, err error) {
 		if p.lh.kind == '|' || p.lh.kind == ';' {
 			break
 		}
+		nextvarid++
 	}
 	n = &Node{
 		op:    OPROD,

@@ -5,7 +5,7 @@ package zebu
 
 import (
 	"fmt"
-) 
+)
 
 func pprint(top *Node) {
 	if top.op != OGRAM {
@@ -147,7 +147,7 @@ func topDump(top *Node) {
 }
 
 func lexerDump(top *Node) {
-	// 1. Lexer types 
+	// 1. Lexer types
 	fmt.Fprintf(codeout, "// Lexing\n")
 	fmt.Fprintf(codeout, "type ZbTokenKind int\n")
 
@@ -156,7 +156,7 @@ func lexerDump(top *Node) {
 	fmt.Fprintf(codeout, "ZBUNKNOWN = 0 - iota\n")
 	// TODO : We will table this for use later
 	for _, n := range top.nodes {
-		if (n.op != OREGDEF) {
+		if n.op != OREGDEF {
 			continue
 		}
 		fmt.Fprintf(codeout, "ZB%s\n", n.sym)
@@ -175,7 +175,7 @@ func lexerDump(top *Node) {
 	fmt.Fprintf(codeout, "}\n")
 	fmt.Fprintf(codeout, "\n")
 
-	// 2. Lexer code 
+	// 2. Lexer code
 	fmt.Fprintf(codeout, "func consZbLexer(buf *bufio.Reader) *ZbLexer {\n")
 	fmt.Fprintf(codeout, "return &ZbLexer {\n")
 	fmt.Fprintf(codeout, "buf: buf,\n")
@@ -196,7 +196,7 @@ func genFriendly(sym *Sym) string {
 	}
 	s += string(b)
 	for i := 1; i < len(sym.name); i++ {
-		if (sym.name[i] == '\'') {
+		if sym.name[i] == '\'' {
 			s += "Prime"
 		} else {
 			s += string(sym.name[i])
@@ -205,8 +205,34 @@ func genFriendly(sym *Sym) string {
 	return s
 }
 
+func callFriendly(n *Node) string {
+	return fmt.Sprintf("parse%s()", genFriendly(n.sym))
+}
+
+func caseFriendly(n *Node) string {
+	switch n.op {
+	case OSTRLIT:
+		return fmt.Sprintf("'%s'", n.lit.lit)
+	case OREGDEF:
+		return fmt.Sprintf("ZB%s", n.sym)
+	default:
+		panic(fmt.Sprintf("unexpected node op %s during caseFriendly\n", n.op))
+	}
+}
+
+func firstFriendly(n *Node) map[*Node]bool {
+	switch n.op {
+	case ORULE:
+		return first[n]
+	case OREGDEF, OSTRLIT:
+		return map[*Node]bool{n: true}
+	default:
+		panic(fmt.Sprintf("unexpected op %s in firstFriendly\n", n.op))
+	}
+}
+
 func parserDump(top *Node) {
-	// 1. Parser types 
+	// 1. Parser types
 	fmt.Fprintf(codeout, "// Parser\n")
 	fmt.Fprintf(codeout, "type ZbParser struct {\n")
 	fmt.Fprintf(codeout, "lexer *ZbLexer\n")
@@ -234,29 +260,79 @@ func parserDump(top *Node) {
 
 	// 3. Rule code
 	for _, n := range top.nodes {
-		if (n.op != ORULE) {
+		if n.op != ORULE {
 			continue
 		}
-		fmt.Fprintf(codeout, "func (p *ZbParser) parse%s() ", genFriendly(n.sym))
-		if n.ntype != nil {
-			fmt.Fprintf(codeout, "(result %s, err error) {\n", n.ntype.typ)
-		} else {
-			fmt.Fprintf(codeout, "(err error) {\n")
-		}
-		fmt.Fprintf(codeout, "return\n")
-		fmt.Fprintf(codeout, "}\n")
-		fmt.Fprintf(codeout, "\n")
+		ruleDump(n)
 	}
 }
 
-// Code Generated 
+func ruleDump(n *Node) {
+	fmt.Fprintf(codeout, "func (p *ZbParser) parse%s() ", genFriendly(n.sym))
+	if n.ntype != nil {
+		fmt.Fprintf(codeout, "(result %s, err error) {\n", n.ntype.typ)
+	} else {
+		fmt.Fprintf(codeout, "(err error) {\n")
+	}
+
+	// 3.1. Switch for all productions
+	hasepsilon := false
+	fmt.Fprintf(codeout, "switch p.lookahead {\n")
+	for _, prod := range n.nodes {
+		n1 := prod.nodes[0]
+		if n1.left.op == OEPSILON {
+			hasepsilon = true
+			continue
+		}
+		firsts := firstFriendly(n1.left)
+		fmt.Fprintf(codeout, "case ")
+		prev := false
+		for n1, _ := range firsts {
+			if prev {
+				fmt.Fprintf(codeout, ", %s", caseFriendly(n1))
+			} else {
+				fmt.Fprintf(codeout, "%s", caseFriendly(n1))
+				prev = true
+			}
+		}
+		fmt.Fprintf(codeout, ":\n")
+
+		// 3.2. Production code
+		for _, n1 := range prod.nodes {
+			switch n1.left.op {
+			case OSTRLIT, OREGDEF:
+				fmt.Fprintf(codeout, "expect(%s)\n", caseFriendly(n1.left))
+			case ORULE:
+				fmt.Fprintf(codeout, "%s\n", callFriendly(n1.left))
+			}
+		}
+	}
+
+	// 3.x. Default and End Switch
+	fmt.Fprintf(codeout, "default:\n")
+	if hasepsilon {
+		fmt.Fprintf(codeout, "// epsilon\n")
+		fmt.Fprintf(codeout, "return\n")
+	} else {
+		fmt.Fprintf(codeout, "fmt.Printf(\"error!\")\n")
+		fmt.Fprintf(codeout, "os.Exit(1)\n")
+	}
+	fmt.Fprintf(codeout, "}\n")
+
+	fmt.Fprintf(codeout, "return\n")
+	fmt.Fprintf(codeout, "}\n")
+	fmt.Fprintf(codeout, "\n")
+
+}
+
+// Code Generated
 
 // Lex
 // type ZbLexer struct {
 //   buf *bufio.Reader
 // }
 // func consZbLexer(buf *bufio.Reader) *ZbLexer { }
-// func (l *ZbLexer) next() (tok *Token, err error) { } 
+// func (l *ZbLexer) next() (tok *Token, err error) { }
 
 // Parser
 // type ZbParser struct {
@@ -265,12 +341,10 @@ func parserDump(top *Node) {
 // }
 
 // func consZbParser(buf *bufio.Reader) *ZbParser { }
-// func (p *ZbParser) expect(kind ZbTokenKind) (err error) { 
+// func (p *ZbParser) expect(kind ZbTokenKind) (err error) {
 //   if p.lookahead != kind {
 //     fmt.Printf("error!")
 //     os.Exit(1)
 //	 }
 //   p.lookahead, _ = p.lexer.next()
-//} 
-
-
+//}

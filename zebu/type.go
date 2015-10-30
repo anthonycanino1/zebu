@@ -388,7 +388,7 @@ func typeCheck(top *Node) {
 	removeDirectRecursion(top)
 	//removeIndirectRecursion(top)
 
-	if opt['t'] {
+	if opt['p'] {
 		pprint(top)
 	}
 
@@ -404,4 +404,9 @@ func typeCheck(top *Node) {
 
 	// 3. Check for LL(1) grammar
 	ll1Check(top)
+
+	if opt['t'] {
+		top.dumpTree()
+	}
+
 }
