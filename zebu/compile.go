@@ -259,6 +259,7 @@ func init() {
 	follow = make(map[*Node]map[*Node]bool)
 	varids = make([]*Sym, 0, 0)
 
+	flag.BoolVar(&opt['D'], "D", false, "turn on debug messages")
 	flag.BoolVar(&opt['h'], "h", false, "print this help message")
 	flag.BoolVar(&opt['d'], "d", false, "dump the AST after parsing")
 	flag.BoolVar(&opt['t'], "t", false, "dump the AST after transformation")
@@ -410,6 +411,12 @@ func exit(status int) {
 	os.Exit(status)
 }
 
+func dbg(msg string, args ...interface{}) {
+	if opt['D'] {
+		fmt.Fprintf(os.Stderr, msg, args...)
+	}
+}
+
 func Main() {
 	flag.Parse()
 	args := flag.Args()
@@ -429,12 +436,15 @@ func Main() {
 	}
 	codeout = bufio.NewWriter(file)
 
+	dbg("Starting compilation\n")
+
 	// Pass #1: Parse grammar (dependencies must be in include path)
 	name := args[0]
 	top := zbparser.parse(name)
 	if numTotalErrs > 0 {
 		exit(1)
 	}
+	dbg("Finished Pass #1\n")
 
 	// Pass #1.5: Resolve symbols (this resolution should be pushed
 	// into Pass #2 in the future to amortize the cost).
@@ -442,6 +452,7 @@ func Main() {
 	if numTotalErrs > 0 {
 		exit(1)
 	}
+	dbg("Finished Pass #1.5\n")
 
 	if opt['d'] {
 		top.dumpTree()
@@ -449,6 +460,7 @@ func Main() {
 
 	// Pass #2: Type check and transform the tree into a valid LL(1) grammar.
 	typeCheck(top)
+	dbg("Finished Pass #2\n")
 
 	if numTotalErrs > 0 {
 		exit(1)
@@ -458,12 +470,15 @@ func Main() {
 	// we should be error free. Use panics to check for cases that should never
 	// occur.
 	codeGen(top)
+	dbg("Finished Pass #3\n")
 
 	// Pass #4: Dump out the generated code
 	codeDump(top)
+	dbg("Finished Pass #4\n")
 
 	// Clean up with gofmt
 	gofmt()
 
+	dbg("Compilation finished\n")
 	exit(0)
 }

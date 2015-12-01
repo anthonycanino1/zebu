@@ -341,6 +341,9 @@ func (p *Parser) parseAction() (n *Node, err error) {
 	codebuf := make([]byte, 0, 512)
 	for {
 		c := p.lexer.raw()
+		if c == 0 {
+			exit(1)
+		}
 		if c == '}' && lvl == 0 {
 			break
 		}
@@ -351,9 +354,12 @@ func (p *Parser) parseAction() (n *Node, err error) {
 			lvl--
 		case '$':
 			buf := []byte{'$'}
-			for c1 := p.lexer.raw(); isVarIdChar(c1); c1 = p.lexer.raw() {
+			c1 := p.lexer.raw()
+			for isVarIdChar(c1) {
 				buf = append(buf, c1)
+				c1 = p.lexer.raw()
 			}
+			p.lexer.putc(c1)
 			s := symbols.lookup(string(buf))
 			if s.defn == nil {
 				if s.name != "$$" {
@@ -421,7 +427,7 @@ func (p *Parser) parseTerm() (n *Node, err error) {
 	return
 }
 
-func (p *Parser) parseProdElem() (n *Node, err error) {
+func (p *Parser) parseProdElem() (n *Node, a *Node, err error) {
 	var nn *Node
 	switch p.lh.kind {
 	case TERMINAL:
