@@ -13,12 +13,15 @@ const (
 	OGRAM
 	ORULE
 	OPROD
-	OPRODELEM
+
+	// OPRODDCL is the merge of an OPRODELEM and OVARID
+	OPRODDCL
+	OSELF
+
 	OSTRLIT
 	OTYPE
 	OACTION
 	OEPSILON
-	OVARID
 
 	OREGDEF
 	OCAT
@@ -34,24 +37,24 @@ const (
 type NodeOp int
 
 var nodeOpLabels = map[NodeOp]string{
-	OXXX:      "oxxx",
-	ONONAME:   "ononame",
-	OGRAM:     "ogram",
-	ORULE:     "orule",
-	OPROD:     "oprod",
-	OREGDEF:   "oregdef",
-	OSTRLIT:   "ostrlit",
-	OPRODELEM: "oprodelem",
-	OTYPE:     "otype",
-	OACTION:   "oaction",
-	OEPSILON:  "oepsilon",
-	OVARID:    "ovarid",
+	OXXX:     "oxxx",
+	ONONAME:  "ononame",
+	OGRAM:    "ogram",
+	ORULE:    "orule",
+	OPROD:    "oprod",
+	OREGDEF:  "oregdef",
+	OSTRLIT:  "ostrlit",
+	OTYPE:    "otype",
+	OACTION:  "oaction",
+	OEPSILON: "oepsilon",
+	OPRODDCL: "oproddcl",
 }
 
 func (n NodeOp) String() string {
 	return nodeOpLabels[n]
 }
 
+// TODO: Fix the way dpn is handled across OACTION and everything else
 type Node struct {
 	// Node shape
 	left  *Node
@@ -67,22 +70,20 @@ type Node struct {
 	byt     byte
 	pos     *Position
 	isError bool
+	dpn     []*Node // OPRODDCL that this node depends upon
 
 	// Walking
 	resolve  bool
 	ll1check bool
 	pprint   bool
 
-	// OPRODELEM
-	action *Node
+	// OPRODDCL
+	used bool
 
 	// OACTION/OTYPE
 	code  []byte
 	typ   string
 	etype ast.Expr
-
-	// OVARID
-	used bool
 
 	// OREPEAT
 	lb int
@@ -96,25 +97,13 @@ var nepsilon = &Node{
 	op: OEPSILON,
 }
 
-func (n *Node) String() string {
-	switch n.op {
-	case OGRAM, ORULE, OREGDEF:
-		return fmt.Sprintf("%s : %s", n.op, n.sym)
-	case OSTRLIT:
-		return fmt.Sprintf("%s : %s", n.op, n.lit)
-	case OPRODELEM:
-		return fmt.Sprintf("%s : (%s)", n.op, n.left)
-	default:
-		return fmt.Sprintf("%s", n.op)
-	}
-}
-
-func (n *Node) prodElem() *Node {
-	if n.op == OPRODELEM {
+// HINT: This is where I may need to rework things
+func (n *Node) prodDcl() *Node {
+	if n.op == OPRODDCL {
 		panic("should never build an oprodelem from an oprodleme")
 	}
 	return &Node{
-		op:   OPRODELEM,
+		op:   OPRODDCL,
 		left: n,
 	}
 }
@@ -132,10 +121,11 @@ func nodeRuleFromFactoring(dcl *Node, remain [][]*Node) (rule *Node) {
 	for _, elmns := range remain {
 		if len(elmns) == 0 {
 			elmns = append(elmns, &Node{
-				op:   OPRODELEM,
+				op:   OPRODDCL,
 				left: nepsilon,
 			})
 		}
+
 		prods = append(prods, &Node{
 			op:    OPROD,
 			nodes: elmns,
@@ -154,6 +144,7 @@ func nodeRuleFromFactoring(dcl *Node, remain [][]*Node) (rule *Node) {
 	return
 }
 
+// NOTE: Example for the uglyness of OOP
 func nodeRuleFromLeftRecursion(dcl *Node, prod *Node) (rule *Node) {
 	rname := primeName(dcl.sym.name)
 	s := symbols.lookup(rname)
@@ -168,13 +159,15 @@ func nodeRuleFromLeftRecursion(dcl *Node, prod *Node) (rule *Node) {
 	prods := make([]*Node, 0)
 	prods = append(prods, &Node{
 		op:    OPROD,
-		nodes: []*Node{nepsilon.prodElem()},
+		nodes: []*Node{nepsilon.prodDcl()},
 	})
+
 	prods = append(prods, &Node{
 		op:    OPROD,
-		nodes: append(remain, rule.prodElem()),
+		nodes: append(remain, rule.prodDcl()),
 	})
-	rule.nodes = prods
+	rule.nodes = prods 
+	
 	return
 }
 
@@ -195,6 +188,25 @@ func (n *Node) dumpTree() {
 	w := consStdoutCodeWriter()
 	walkdump(n, w)
 	w.flush()
+}
+
+func walkstring(n *Node) string {
+	switch n.left.op {
+	case ORULE:
+		return fmt.Sprintf("(TERMINAL: %s -- VAR:%s)", n.left.sym, n.sym)
+	case OREGDEF:
+		return fmt.Sprintf("(NONTERMINAL: %s -- VAR:%s)", n.left.sym, n.sym)
+	case OSTRLIT:
+		return fmt.Sprintf("(STRLIT: '%s' -- VAR:%s)", escapeStrlit(n.left.lit.lit), n.sym)
+	case OEPSILON:
+		return fmt.Sprintf("(OEPSILON -- VAR:%s)", n.sym)
+	case ONONAME:
+		return fmt.Sprintf("(ONONAME: %s -- VAR:%s)", n.left.sym, n.sym)
+	case OSELF:
+		return fmt.Sprintf("(OSELF -- VAR:%s)", n.sym)
+	default:
+		panic(fmt.Sprintf("unexpected op %s in walkstring\n", n.left.op))
+	}
 }
 
 func walkdump(n *Node, w *CodeWriter) {
@@ -287,26 +299,28 @@ func walkdump(n *Node, w *CodeWriter) {
 		w.enter()
 
 		for _, n2 := range n.nodes {
-			// Dip directly into PRODELEM
 			switch n2.left.op {
 			case ORULE:
-				w.writeln("(TERMINAL: %s)", n2.left.sym)
+				w.write("(TERMINAL: %s -- VAR:%s", n2.left.sym, n2.sym)
 			case OREGDEF:
-				w.writeln("(NONTERMINAL: %s)", n2.left.sym)
+				w.write("(NONTERMINAL: %s -- VAR:%s", n2.left.sym, n2.sym)
 			case OSTRLIT:
-				w.writeln("(STRLIT: '%s')", escapeStrlit(n2.left.lit.lit))
+				w.write("(STRLIT: '%s' -- VAR:%s", escapeStrlit(n2.left.lit.lit), n2.sym)
 			case OEPSILON:
-				w.writeln("(OEPSILON)")
+				w.write("(OEPSILON -- VAR:%s", n2.sym)
 			case ONONAME:
-				w.writeln("(ONONAME: %s)", n2.left.sym)
+				w.write("(ONONAME: %s -- VAR:%s", n2.left.sym, n2.sym)
+			default:
+				panic(fmt.Sprintf("unexpected op %s in walkdump\n", n2.left.op))
 			}
+			if n2.right == nil {
+				w.writeln(")")
+				continue
+			}
+			w.newline()
 			w.enter()
-			if n2.right != nil {
-				w.writeln("(VARID: %s)", n2.right.sym)
-			}
-			if n2.action != nil {
-				w.writeln("(ACTION)")
-			}
+			w.writeln("(OACTION: %s)", n2.right.sym)
+			w.writeln(")")
 			w.exit()
 		}
 

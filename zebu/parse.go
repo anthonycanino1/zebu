@@ -339,6 +339,7 @@ func (p *Parser) parseAction() (n *Node, err error) {
 	}
 	lvl := 0
 	codebuf := make([]byte, 0, 512)
+	dpn := make([]*Node, 0)
 	for {
 		c := p.lexer.raw()
 		if c == 0 {
@@ -367,6 +368,7 @@ func (p *Parser) parseAction() (n *Node, err error) {
 				}
 			} else {
 				s.defn.used = true
+				dpn = append(dpn, s.defn)
 			}
 			codebuf = append(codebuf, buf...)
 			continue
@@ -376,22 +378,43 @@ func (p *Parser) parseAction() (n *Node, err error) {
 	// Reset the lh token
 	p.next()
 
-	n = &Node{
+	// TODO: Lots of tricky logic here. Eventually move.
+	// (1) Create an (OACTION) to house the actual action
+	// (2) Create a new rule (ORULE) for this action,
+	// (3) Create a new epsilon production for this rule that takes the actual action.
+	// (4) Return a reference to the ORULE so it gets placed in an OPRODDCL
+	// (5) Insert the new ORULE into the grammar
+	s := symbols.lookup(fmt.Sprintf("'A%d_%s", nextaction, currule.sym))
+	nextaction++
+
+	action := &Node{
 		op:   OACTION,
 		code: codebuf,
-	}
+		sym: s,
+	} 
+
+	n = newname(s)
+	n.op = ORULE
+	n.nodes = []*Node{&Node{
+		op: OPROD,
+		nodes: []*Node{&Node{
+			op:    OPRODDCL,
+			left:  nepsilon,
+			right: action,
+		}},
+	}}
+	declare(n)
+	curgram.nodes = append(curgram.nodes, n)
 
 	return
 }
 
-func (p *Parser) parseVarId() (n *Node, err error) {
+func (p *Parser) parseVarId() (s *Sym, err error) {
 	t, err := p.match(VARID)
 	if err != nil {
 		return
 	}
-	n = newname(t.sym)
-	n.op = OVARID
-	declare(n)
+	s = t.sym
 	return
 }
 
@@ -427,17 +450,20 @@ func (p *Parser) parseTerm() (n *Node, err error) {
 	return
 }
 
-func (p *Parser) parseProdElem() (n *Node, a *Node, err error) {
-	var nn *Node
+// LAST : Transform the parse of an Action into a "nonterm" rule
+func (p *Parser) parseProdElem() (n *Node, err error) {
+	var n2 *Node
 	switch p.lh.kind {
 	case TERMINAL:
-		nn, err = p.parseTerm()
+		n2, err = p.parseTerm()
 	case NONTERMINAL:
-		nn, err = p.parseNonterm()
+		n2, err = p.parseNonterm()
 	case STRLIT:
-		nn, err = p.parseStrlit()
-	case '|', '{', ';':
-		nn, err = p.parseEpsilon()
+		n2, err = p.parseStrlit()
+	case '|', ';':
+		n2, err = p.parseEpsilon()
+	case '{':
+		n2, err = p.parseAction()
 	default:
 		err = compileError(p.lh.pos, "unexpected %s.", p.lh)
 	}
@@ -445,25 +471,22 @@ func (p *Parser) parseProdElem() (n *Node, a *Node, err error) {
 		return
 	}
 	n = &Node{
-		op:   OPRODELEM,
-		left: nn,
+		op:   OPRODDCL,
+		left: n2,
 	}
 	if p.lh.kind == '=' {
 		p.match('=')
-		n.right, err = p.parseVarId()
+		n.sym, err = p.parseVarId()
 		if err != nil {
 			return
 		}
-		pushvarid(n.right.sym)
+		declare(n)
+		pushvarid(n.sym)
 	} else {
-		n.right = newname(pushnextvarid())
-		n.right.op = OVARID
-		declare(n.right)
+		n.sym = pushnextvarid()
+		declare(n)
 	}
-	n.right.ntype = n
-	if p.lh.kind == '{' {
-		n.action, err = p.parseAction()
-	}
+
 	return
 }
 
@@ -472,11 +495,11 @@ func (p *Parser) parseProd() (n *Node, err error) {
 	nextvarid = 1
 	defer popvarids()
 	for {
-		var nn *Node
-		if nn, err = p.parseProdElem(); err != nil {
+		var n2 *Node
+		if n2, err = p.parseProdElem(); err != nil {
 			return
 		}
-		l = append(l, nn)
+		l = append(l, n2)
 		if p.lh.kind == '|' || p.lh.kind == ';' {
 			break
 		}
@@ -608,6 +631,8 @@ func (p *Parser) parseRule() (n *Node, err error) {
 	}
 	n.op = ORULE
 	declare(n)
+	currule = n
+	nextaction = 0
 
 	if p.lh.kind == '=' {
 		// TODO : Somewhat hacky to lex/parse right now, clean up
@@ -662,7 +687,7 @@ func (p *Parser) parseEscapeCode() (code []byte, err error) {
 		c := p.lexer.raw()
 		if c == '@' {
 			c2 := p.lexer.raw()
-			if (c2 == '}') {
+			if c2 == '}' {
 				break
 			}
 			p.lexer.putc(c2)
@@ -687,6 +712,7 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 	n = newname(s)
 	n.op = OGRAM
 	n.nodes = make([]*Node, 0)
+	curgram = n
 	declare(n)
 
 	p.match(';')
@@ -694,7 +720,7 @@ func (p *Parser) parseGrammar() (n *Node, err error) {
 	if p.lh.kind == ESCOPEN {
 		if n.code, err = p.parseEscapeCode(); err != nil {
 			return
-		} 
+		}
 	}
 
 	for p.lh.kind != EOF {

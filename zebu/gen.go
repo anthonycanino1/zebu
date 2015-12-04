@@ -36,7 +36,11 @@ func pprintWalk(n *Node, w *CodeWriter) {
 
 	switch n.op {
 	case ORULE:
-		w.writeln("%s", n.sym)
+		w.write("%s=", n.sym)
+		if n.ntype != nil {
+			w.write("%s", n.ntype.typ)
+		}
+		w.newline()
 		first := true
 		w.enter()
 		for _, p := range n.nodes {
@@ -51,8 +55,15 @@ func pprintWalk(n *Node, w *CodeWriter) {
 				switch e.left.op {
 				case OSTRLIT:
 					w.write("'%s' ", escapeStrlit(e.left.lit.lit))
-				case OREGDEF, ORULE:
-					w.write("%s ", e.left.sym)
+				case OREGDEF, ORULE, OACTION:
+					w.write("%s", e.left.sym)
+					if e.left.op == ORULE {
+						w.write("=")
+						if e.left.ntype != nil {
+							w.write("%s", e.left.ntype.typ)
+						}
+					}
+					w.write(" ")
 				case OEPSILON:
 					w.write("/* epsilon */ ")
 				default:

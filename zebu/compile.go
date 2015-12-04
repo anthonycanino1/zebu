@@ -174,7 +174,10 @@ var types TypeTab
 var strlits StrlitTab
 var varids []*Sym
 var nextvarid int
+var nextaction int
 var opt [256]bool
+var currule *Node
+var curgram *Node
 
 var errors []*CCError
 var numSavedErrs int
@@ -261,11 +264,10 @@ func init() {
 
 	flag.BoolVar(&opt['D'], "D", false, "turn on debug messages")
 	flag.BoolVar(&opt['h'], "h", false, "print this help message")
-	flag.BoolVar(&opt['d'], "d", false, "dump the AST after parsing")
-	flag.BoolVar(&opt['t'], "t", false, "dump the AST after transformation")
+	flag.BoolVar(&opt['0'], "d0", false, "dump the AST after parsing")
+	flag.BoolVar(&opt['1'], "d1", false, "dump the AST after transformation")
 	flag.BoolVar(&opt['p'], "p", false, "pretty print the AST after transformation")
 	flag.BoolVar(&opt['g'], "g", false, "print semantic information about grammar construction")
-	flag.BoolVar(&opt['n'], "n", false, "skip dump of generated output")
 	flag.StringVar(&outflag, "o", "", "generated output file")
 
 	// Populate symbol table with known symbols
@@ -454,7 +456,7 @@ func Main() {
 	}
 	dbg("Finished Pass #1.5\n")
 
-	if opt['d'] {
+	if opt['0'] {
 		top.dumpTree()
 	}
 
@@ -473,7 +475,7 @@ func Main() {
 	dbg("Finished Pass #3\n")
 
 	// Pass #4: Dump out the generated code
-	codeDump(top)
+	//codeDump(top)
 	dbg("Finished Pass #4\n")
 
 	// Clean up with gofmt

@@ -61,7 +61,7 @@ func leftFactor(top *Node) {
 				common = append(common, factors[0][i])
 				last = i
 			}
-			if (last == -1) {
+			if last == -1 {
 				panic("nothing found in common after determing a common path")
 			}
 
@@ -85,7 +85,7 @@ func leftFactor(top *Node) {
 			newProds = append(newProds, &Node{
 				op: OPROD,
 				nodes: append(common, &Node{
-					op:   OPRODELEM,
+					op:   OPRODDCL,
 					left: fact,
 				}),
 			})
@@ -124,7 +124,7 @@ func removeDirectRecursion(top *Node) {
 		top.nodes = append(top.nodes, rule)
 
 		for _, prod := range nonRec {
-			prod.nodes = append(prod.nodes, rule.prodElem())
+			prod.nodes = append(prod.nodes, rule.prodDcl())
 		}
 
 		dcl.nodes = nonRec
@@ -325,7 +325,7 @@ func ll1Check(top *Node) {
 			switch fst.op {
 			case OSTRLIT, OREGDEF:
 				if disjoint[fst] {
-					if (dcl.orig != nil) {
+					if dcl.orig != nil {
 						compileError(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
 					} else {
 						compileError(dcl.pos, "%s is ambiguous", dcl.sym)
@@ -336,7 +336,7 @@ func ll1Check(top *Node) {
 				if followNotAdded {
 					for k, _ := range follow[dcl] {
 						if disjoint[k] {
-							if (dcl.orig != nil) {
+							if dcl.orig != nil {
 								compileError(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
 							} else {
 								compileError(dcl.pos, "%s is ambiguous", dcl.sym)
@@ -351,7 +351,7 @@ func ll1Check(top *Node) {
 					// Use follow[dcl]
 					for k, _ := range follow[dcl] {
 						if disjoint[k] {
-							if (dcl.orig != nil) {
+							if dcl.orig != nil {
 								compileError(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
 							} else {
 								compileError(dcl.pos, "%s is ambiguous", dcl.sym)
@@ -364,7 +364,7 @@ func ll1Check(top *Node) {
 					// Use first[fst]
 					for k, _ := range first[fst] {
 						if disjoint[k] {
-							if (dcl.orig != nil) {
+							if dcl.orig != nil {
 								compileError(dcl.orig.pos, "%s is ambiguous", dcl.orig.sym)
 							} else {
 								compileError(dcl.pos, "%s is ambiguous", dcl.sym)
@@ -377,7 +377,6 @@ func ll1Check(top *Node) {
 				panic(fmt.Sprintf("unexpected op %s in production\n", fst.op))
 			}
 		}
-
 	}
 }
 
@@ -405,7 +404,7 @@ func typeCheck(top *Node) {
 	// 3. Check for LL(1) grammar
 	ll1Check(top)
 
-	if opt['t'] {
+	if opt['1'] {
 		top.dumpTree()
 	}
 
